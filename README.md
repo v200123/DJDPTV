@@ -8,7 +8,8 @@ Android TV 党建大屏客户端，应用包名为 `com.fpa.dangjiandaping`。
 - Tab 以下内容区：Android WebView，加载
   `http://192.168.20.233:5173/xiaoyuTv/#/teacher`。
 - 支持遥控器方向键焦点、确认键点击、WebView 历史返回。
-- H5 可调用 `window.AndroidFocusBridge.requestPreviousTabFocus()`，将焦点交还当前选中的原生 Tab。
+- 顶部导航使用 `androidx.tv:tv-material` 的 `TabRow` 和 `Tab`，支持图片指示器、推荐角标和焦点恢复。
+- H5 可调用 `window.AndroidFocusBridge.requestPreviousTabFocus()`，将焦点交还最后聚焦的原生 Tab。
 - 固定横屏、沉浸式全屏，并允许访问局域网 HTTP 地址。
 
 ## 构建
