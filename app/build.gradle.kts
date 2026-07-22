@@ -44,6 +44,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.foundation:foundation")
     implementation("androidx.tv:tv-material:1.1.0")
+    implementation("io.github.carguo:gsyvideoplayer-compose:13.1.0")
+    implementation("io.github.carguo:gsyvideoplayer-exo2:13.1.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

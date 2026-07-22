@@ -1,7 +1,7 @@
 package com.fpa.dangjiandaping.ui.navigation
 
 private const val TEMPORARY_WEB_URL =
-    "http://192.168.20.118:5173/xiaoyuTv/#/find-party-member"
+    "http://192.168.20.233:5173/xiaoyuTv/#/"
 
 internal sealed interface TvTabDestination {
     data object NativeHome : TvTabDestination

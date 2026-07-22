@@ -3,14 +3,16 @@ package com.fpa.dangjiandaping.ui.screen
 import android.view.SoundEffectConstants
 import android.webkit.WebView
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.background
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -21,12 +23,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.tv.material3.MaterialTheme
+import com.fpa.dangjiandaping.R
 import com.fpa.dangjiandaping.ui.header.NativeHeader
 import com.fpa.dangjiandaping.ui.header.rememberTvTabFocusRequesters
 import com.fpa.dangjiandaping.ui.home.HomeScreen
@@ -67,11 +71,18 @@ fun DangJianTvScreen() {
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color(0xFFB50000))
+
     ) {
-        val nativeHeaderHeight = (this.maxHeight * 0.14f).coerceIn(72.dp, 144.dp)
+
+        Image(
+            painter = painterResource(R.drawable.bg_app),
+            contentDescription = null,
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier.fillMaxSize(),
+        )
 
         Column(Modifier.fillMaxSize()) {
+            Spacer(modifier = Modifier.height(88.dp))
             NativeHeader(
                 selectedTab = selectedTab,
                 focusedTab = lastFocusedTab,
@@ -84,35 +95,36 @@ fun DangJianTvScreen() {
                 },
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(nativeHeaderHeight)
             )
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f)
-                    .clipToBounds()
             ) {
-                WebContent(
-                    url = webUrl,
-                    active = webDestination != null,
-                    onCreated = { webView = it },
-                    onReleased = { releasedView ->
-                        if (webView === releasedView) {
-                            webView = null
-                        }
-                    },
-                    onCanGoBackChanged = { canWebViewGoBack = it },
-                    onRequestNativeFocus = {
-                        tabFocusRequesters[lastFocusedTab].requestFocus()
-                    },
-                    modifier = Modifier.fillMaxSize().padding(12.dp)
-                )
-
                 if (destination is TvTabDestination.NativeHome) {
                     HomeScreen(
                         modifier = Modifier.fillMaxSize()
                     )
+                }else {
+                    WebContent(
+                        url = webUrl,
+                        active = webDestination != null,
+                        onCreated = { webView = it },
+                        onReleased = { releasedView ->
+                            if (webView === releasedView) {
+                                webView = null
+                            }
+                        },
+                        onCanGoBackChanged = { canWebViewGoBack = it },
+                        onRequestNativeFocus = {
+                            tabFocusRequesters[lastFocusedTab].requestFocus()
+                        },
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(12.dp)
+                    )
                 }
+
+
             }
         }
     }

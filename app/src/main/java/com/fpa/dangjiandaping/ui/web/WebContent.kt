@@ -87,11 +87,8 @@ internal fun WebContent(
                 modifier = Modifier.fillMaxSize(),
                 factory = { context ->
                     WebView(context).apply {
-                        layoutParams = ViewGroup.LayoutParams(
-                            ViewGroup.LayoutParams.MATCH_PARENT,
-                            ViewGroup.LayoutParams.MATCH_PARENT
-                        )
-                        visibility = if (active) View.VISIBLE else View.INVISIBLE
+
+                        visibility = if (active) View.VISIBLE else View.GONE
                         isFocusable = active
                         isFocusableInTouchMode = active
                         if (!active) {

@@ -67,23 +67,15 @@ internal fun NativeHeader(
     modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier.background(
-            Brush.horizontalGradient(
-                listOf(
-                    Color(0xFFB00000),
-                    Color(0xFFDF130B),
-                    Color(0xFFA60000)
-                )
-            )
-        )
+        modifier = modifier.height(33.dp)
     ) {
-        HeaderBrandRow(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(0.54f)
-                .padding(horizontal = 28.dp)
-        )
-        HeaderDivider()
+//        HeaderBrandRow(
+//            modifier = Modifier
+//                .fillMaxWidth()
+//                .weight(0.54f)
+//                .padding(horizontal = 28.dp)
+//        )
+//        HeaderDivider()
         HeaderTabRow(
             selectedTab = selectedTab,
             focusedTab = focusedTab,
@@ -92,8 +84,6 @@ internal fun NativeHeader(
             onTabSelected = onTabSelected,
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(0.46f)
-                .padding(horizontal = 32.dp)
         )
     }
 }
@@ -121,7 +111,7 @@ private fun HeaderBrandRow(modifier: Modifier = Modifier) {
         )
         Spacer(Modifier.weight(1f))
         Column(horizontalAlignment = Alignment.End) {
-            Text("中共甘孜州委组织部", color = Color(0xFFFFD186), fontSize = 22.sp)
+            Text("中共甘孜州委组织部", color = Color(0xFFFFD186), fontSize = 12.sp)
             Text(currentDateText(), color = Color(0xFFFFD186), fontSize = 10.sp)
         }
     }
@@ -165,7 +155,6 @@ private fun HeaderTabRow(
         TV_TABS.forEachIndexed { index, tab ->
             val focused = tabRowHasFocus && focusedTab == index
             val retainedFocus = !tabRowHasFocus && focusedTab == index
-
             Box(
                 modifier = Modifier
                     .weight(tab.widthWeight)
@@ -175,8 +164,7 @@ private fun HeaderTabRow(
                         if (focusState.isFocused) {
                             onTabFocused(index)
                             Log.d(FOCUS_LOG_TAG, "NativeTab[$index][${tab.title}] FOCUSED")
-                        }
-                    }
+                        } }
                     .selectable(
                         selected = selectedTab == index,
                         onClick = { onTabSelected(index) },
@@ -201,7 +189,7 @@ private fun TabBrushIndicator(modifier: Modifier = Modifier) {
         painter = painterResource(R.drawable.ic_top_tab_ind),
         contentDescription = null,
         contentScale = ContentScale.None,
-        modifier = modifier.size(width = 56.dp, height = 9.dp)
+        modifier = modifier.size(width = 53.dp, height = 9.dp).offset(0.dp,2.dp)
     )
 }
 
@@ -217,22 +205,15 @@ private fun TvTabContent(
         targetValue = if (focused) 1.06f else 1f,
         label = "tabScale"
     )
-
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(horizontal = 4.dp, vertical = 2.dp)
     ) {
         Box(
             modifier = Modifier
                 .align(Alignment.Center)
                 .fillMaxWidth()
-                .padding(
-                    start = 5.dp,
-                    top = if (recommended) 7.dp else 5.dp,
-                    end = if (recommended) 12.dp else 5.dp,
-                    bottom = 5.dp
-                ),
+               ,
             contentAlignment = Alignment.Center
         ) {
             Text(
