@@ -12,6 +12,7 @@ import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -24,6 +25,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.tooling.preview.Preview
@@ -31,8 +34,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.fpa.dangjiandaping.BuildConfig
 
 private const val FOCUS_LOG_TAG = "FocusTrace"
+private const val WEB_LOG_TAG = "WebContent"
 
 private class WebFocusBridge(
     private val webView: WebView,
@@ -70,20 +75,20 @@ private class WebFocusBridge(
 @Composable
 internal fun WebContent(
     url: String,
-    active: Boolean,
+//    active: Boolean,
     onCreated: (WebView) -> Unit,
     onReleased: (WebView) -> Unit,
     onCanGoBackChanged: (Boolean) -> Unit,
     onRequestNativeFocus: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    if (LocalInspectionMode.current) {
-        WebContentPlaceholder(
-            message = "网页内容预览区",
-            modifier = modifier
-        )
-        return
-    }
+//    if (LocalInspectionMode.current) {
+//        WebContentPlaceholder(
+//            message = "网页内容预览区",
+//            modifier = modifier
+//        )
+//        return
+//    }
 
 //    var createWebView by remember { mutableStateOf(false) }
     var loadingUrl by remember { mutableStateOf<String?>(url) }
@@ -95,25 +100,37 @@ internal fun WebContent(
 //        withFrameNanos { }
 //        createWebView = true
 //    }
-    LaunchedEffect(url) {
-        loadingUrl = url
-    }
-    LaunchedEffect(active) {
-        if (!active) newsDetail = null
-    }
+//    LaunchedEffect(active) {
+//        if (!active) newsDetail = null
+//    }
 
-    Box(modifier = modifier) {
+    Box(
+        modifier = modifier
+            .focusProperties {
+                onExit = {
+                    if (requestedFocusDirection == FocusDirection.Up) {
+                        onRequestNativeFocus()
+                    } else {
+                        cancelFocusChange()
+                    }
+                }
+            }
+            .focusGroup(),
+    ) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { context ->
+                    if (BuildConfig.DEBUG) {
+                        WebView.setWebContentsDebuggingEnabled(true)
+                        Log.i(WEB_LOG_TAG, "WebView remote debugging enabled")
+                    }
                     WebView(context).apply {
-
-                        isActivated = active
-                        isFocusable = active
-                        isFocusableInTouchMode = active
-                        if (!active) {
-                            onPause()
-                        }
+//                        isActivated = active
+//                        isFocusable = active
+//                        isFocusableInTouchMode = active
+//                        if (!active) {
+//                            onPause()
+//                        }
                         onFocusChangeListener = View.OnFocusChangeListener { _, hasFocus ->
                             Log.d(
                                 FOCUS_LOG_TAG,
@@ -164,16 +181,19 @@ internal fun WebContent(
                                 favicon: android.graphics.Bitmap?
                             ) {
                                 super.onPageStarted(view, url, favicon)
+                                Log.i(WEB_LOG_TAG, "onPageStarted: $url")
                                 loadingUrl = view.tag as? String ?: url
                             }
 
                             override fun onPageCommitVisible(view: WebView, url: String?) {
                                 super.onPageCommitVisible(view, url)
+                                Log.i(WEB_LOG_TAG, "onPageCommitVisible: $url")
                                 loadingUrl = null
                             }
 
                             override fun onPageFinished(view: WebView, url: String?) {
                                 super.onPageFinished(view, url)
+                                Log.i(WEB_LOG_TAG, "onPageFinished: $url")
                                 loadingUrl = null
                             }
 
@@ -195,34 +215,35 @@ internal fun WebContent(
                             cacheMode = WebSettings.LOAD_DEFAULT
                             useWideViewPort = true
                             loadWithOverviewMode = true
-                            builtInZoomControls = false
-                            displayZoomControls = false
-                            setSupportZoom(false)
-                            userAgentString = "$userAgentString DangJianDaPingTV/1.0"
+                            builtInZoomControls = true
+                            displayZoomControls = true
+                            userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 Edg/150.0.0.0"
+                            setSupportZoom(true)
                         }
                         tag = url
+                        Log.i(WEB_LOG_TAG, "loadUrl(initial): $url")
                         loadUrl(url)
                         onCreated(this)
                     }
                 },
                 update = { view ->
-                    if (view.isActivated != active) {
-                        view.isActivated = active
-                        if (active) {
-                            view.onResume()
-                        } else {
-                            view.clearFocus()
-                            view.onPause()
-                        }
-                    }
-                    val webViewInteractive = active && newsDetail == null
+//                    if (view.isActivated != active) {
+//                        view.isActivated = active
+//                        if (active) {
+//                            view.onResume()
+//                        } else {
+//                            view.clearFocus()
+//                            view.onPause()
+//                        }
+//                    }
+                    val webViewInteractive = true
                     view.isFocusable = webViewInteractive
                     view.isFocusableInTouchMode = webViewInteractive
                     if (!webViewInteractive && view.hasFocus()) {
                         view.clearFocus()
                     }
-
                     if (view.tag != url) {
+                        Log.i(WEB_LOG_TAG, "loadUrl(routeChanged): ${view.tag} -> $url")
                         view.stopLoading()
                         view.clearHistory()
                         view.tag = url
@@ -230,6 +251,7 @@ internal fun WebContent(
                         onCanGoBackChanged(false)
                         view.loadUrl(url)
                     } else if (view.url.isNullOrEmpty()) {
+                        Log.i(WEB_LOG_TAG, "loadUrl(emptyWebView): $url")
                         loadingUrl = url
                         view.loadUrl(url)
                     }
@@ -246,7 +268,7 @@ internal fun WebContent(
             )
 
 
-        if (active &&  loadingUrl != null) {
+        if ( loadingUrl != null) {
             WebContentPlaceholder(
                 message = "页面加载中…",
                 modifier = Modifier.fillMaxSize()
@@ -288,8 +310,7 @@ private fun WebContentPlaceholder(
 private fun WebContentPreview() {
     MaterialTheme {
         WebContent(
-            url = "http://example.com",
-            active = true,
+            url = "https://www.baidu.com",
             onCreated = {},
             onReleased = {},
             onCanGoBackChanged = {},

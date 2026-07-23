@@ -4,6 +4,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.view.SoundEffectConstants
+import android.view.View
 import android.webkit.WebView
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -21,8 +22,11 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -63,8 +67,10 @@ fun DangJianTvScreen() {
     var headerHasFocus by remember { mutableStateOf(false) }
     var webView by remember { mutableStateOf<WebView?>(null) }
     var canWebViewGoBack by remember { mutableStateOf(false) }
+    var pendingContentFocusRoute by remember { mutableStateOf<TvRoute?>(null) }
 
     val tabFocusRequesters = rememberTvTabFocusRequesters()
+    val contentFocusRequester = remember { FocusRequester() }
     val rootView = LocalView.current
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
@@ -75,6 +81,22 @@ fun DangJianTvScreen() {
         backStack.add(route)
     }
 
+    fun requestSelectedTabFocus() {
+        lastFocusedTab = selectedTab
+        tabFocusRequesters[selectedTab].requestFocus(FocusDirection.Up)
+    }
+
+    fun activateTab(tabIndex: Int, moveFocusToContent: Boolean) {
+        lastFocusedTab = tabIndex
+        val targetRoute = TV_TABS[tabIndex].destination.toRoute(tabIndex)
+        if (targetRoute != currentRoute) {
+            webView = null
+            replaceRoute(targetRoute)
+        }
+        pendingContentFocusRoute = if (moveFocusToContent) targetRoute else null
+        rootView.playSoundEffect(SoundEffectConstants.CLICK)
+    }
+
     fun handleBack() {
         when {
             currentRoute is WebRoute && !headerHasFocus && canWebViewGoBack -> {
@@ -82,7 +104,7 @@ fun DangJianTvScreen() {
             }
 
             !headerHasFocus -> {
-                tabFocusRequesters[selectedTab].requestFocus()
+                requestSelectedTabFocus()
             }
 
             selectedTab != HOME_TAB_INDEX -> {
@@ -101,8 +123,24 @@ fun DangJianTvScreen() {
         }
     }
 
-    LaunchedEffect(currentRoute) {
+    LaunchedEffect(currentRoute, pendingContentFocusRoute, webView) {
         canWebViewGoBack = false
+        if (pendingContentFocusRoute == currentRoute) {
+            when (currentRoute) {
+                HomeRoute -> {
+                    withFrameNanos { }
+                    contentFocusRequester.requestFocus(FocusDirection.Down)
+                    pendingContentFocusRoute = null
+                }
+
+                is WebRoute -> {
+                    webView?.let { currentWebView ->
+                        currentWebView.requestFocus(View.FOCUS_DOWN)
+                        pendingContentFocusRoute = null
+                    }
+                }
+            }
+        }
     }
 
     @Suppress("UnusedBoxWithConstraintsScope")
@@ -121,14 +159,8 @@ fun DangJianTvScreen() {
                 focusedTab = lastFocusedTab,
                 tabFocusRequesters = tabFocusRequesters,
                 onTabFocused = { lastFocusedTab = it },
-                onTabSelected = { tabIndex ->
-                    lastFocusedTab = tabIndex
-                    val targetRoute = TV_TABS[tabIndex].destination.toRoute(tabIndex)
-                    if (targetRoute != currentRoute) {
-                        replaceRoute(targetRoute)
-                    }
-                    rootView.playSoundEffect(SoundEffectConstants.CLICK)
-                },
+                onTabSelected = { tabIndex -> activateTab(tabIndex, moveFocusToContent = false) },
+                onTabDown = { tabIndex -> activateTab(tabIndex, moveFocusToContent = true) },
                 modifier = Modifier
                     .fillMaxWidth()
                     .onFocusChanged { headerHasFocus = it.hasFocus },
@@ -140,12 +172,17 @@ fun DangJianTvScreen() {
                 onBack = ::handleBack,
                 entryProvider = entryProvider {
                     entry<HomeRoute> {
-                        HomeScreen(modifier = Modifier.fillMaxSize())
+                        HomeScreen(
+                            modifier = Modifier.fillMaxSize(),
+                            contentFocusRequester =
+                                if (currentRoute == HomeRoute) contentFocusRequester else null,
+                            onRequestTabFocus = ::requestSelectedTabFocus,
+                        )
                     }
                     entry<WebRoute> { route ->
                         WebContent(
                             url = route.url,
-                            active = currentRoute == route,
+//                            active = currentRoute == route,
                             onCreated = { createdView ->
                                 if (backStack.lastOrNull() == route) {
                                     webView = createdView
@@ -162,7 +199,7 @@ fun DangJianTvScreen() {
                                 }
                             },
                             onRequestNativeFocus = {
-                                tabFocusRequesters[selectedTab].requestFocus()
+                                requestSelectedTabFocus()
                             },
                             modifier = Modifier
                                 .fillMaxSize()

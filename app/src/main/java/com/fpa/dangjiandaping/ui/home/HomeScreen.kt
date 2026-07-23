@@ -40,6 +40,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusDirection
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
@@ -102,10 +106,29 @@ private val cadreTasks = listOf(
 fun HomeScreen(
     modifier: Modifier = Modifier,
     videoUrl: String = DEFAULT_HOME_VIDEO_URL,
+    contentFocusRequester: FocusRequester? = null,
+    onRequestTabFocus: () -> Unit = {},
 ) {
     Box(
         modifier = modifier
             .fillMaxSize()
+            .then(
+                if (contentFocusRequester != null) {
+                    Modifier.focusRequester(contentFocusRequester)
+                } else {
+                    Modifier
+                },
+            )
+            .focusProperties {
+                onExit = {
+                    if (requestedFocusDirection == FocusDirection.Up) {
+                        onRequestTabFocus()
+                    } else {
+                        cancelFocusChange()
+                    }
+                }
+            }
+            .focusGroup()
     ) {
 //        HomeBackdrop(Modifier.fillMaxSize())
 

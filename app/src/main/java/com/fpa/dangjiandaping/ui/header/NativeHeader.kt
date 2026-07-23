@@ -29,11 +29,17 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontStyle
@@ -65,6 +71,7 @@ fun NativeHeader(
     tabFocusRequesters: List<FocusRequester>,
     onTabFocused: (Int) -> Unit,
     onTabSelected: (Int) -> Unit,
+    onTabDown: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Column(
@@ -82,6 +89,7 @@ fun NativeHeader(
             tabFocusRequesters = tabFocusRequesters,
             onTabFocused = onTabFocused,
             onTabSelected = onTabSelected,
+            onTabDown = onTabDown,
             modifier = Modifier
                 .fillMaxWidth()
         )
@@ -117,6 +125,7 @@ private fun HeaderTabRow(
     tabFocusRequesters: List<FocusRequester>,
     onTabFocused: (Int) -> Unit,
     onTabSelected: (Int) -> Unit,
+    onTabDown: (Int) -> Unit,
     modifier: Modifier = Modifier
 ) {
     var tabRowHasFocus by remember { mutableStateOf(false) }
@@ -135,11 +144,31 @@ private fun HeaderTabRow(
             Box(
                 modifier = Modifier
                     .focusRequester(tabFocusRequesters[index])
+                    .focusProperties {
+                        up = FocusRequester.Cancel
+                        if (index == 0) {
+                            left = FocusRequester.Cancel
+                        }
+                        if (index == TV_TABS.lastIndex) {
+                            right = FocusRequester.Cancel
+                        }
+                    }
                     .onFocusChanged { focusState ->
                         if (focusState.isFocused) {
                             onTabFocused(index)
                             Log.d(FOCUS_LOG_TAG, "NativeTab[$index][${tab.title}] FOCUSED")
                         } }
+                    .onPreviewKeyEvent { event ->
+                        val moveToContent =
+                            event.key == Key.DirectionDown &&
+                                event.type == KeyEventType.KeyDown
+                        if (moveToContent) {
+                            onTabDown(index)
+                            true
+                        } else {
+                            false
+                        }
+                    }
                     .selectable(
                         selected = selectedTab == index,
                         onClick = { onTabSelected(index) },
@@ -248,6 +277,10 @@ private fun NativeHeaderPreview() {
             tabFocusRequesters = focusRequesters,
             onTabFocused = { focusedTab = it },
             onTabSelected = {
+                selectedTab = it
+                focusedTab = it
+            },
+            onTabDown = {
                 selectedTab = it
                 focusedTab = it
             },

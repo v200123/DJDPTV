@@ -6,12 +6,13 @@ import kotlinx.serialization.Serializable
 private const val BASE_URL = "http://192.168.20.233:5173/xiaoyuTv/#/"
 
 private const val HOME_WEB_URL = "$BASE_URL"
-private const val PARTY_MEMBER_URL = "$BASE_URL find-party-member"
-private const val kangba_URL = "$BASE_URL kangba"
-private const val teacher_URL = "$BASE_URL teacher"
-private const val NAV_BASE_URL = "$BASE_URL base"
-private const val courseware_URL = "$BASE_URL courseware"
-private const val party_URL = "$BASE_URL party"
+private const val PARTY_MEMBER_URL = "${BASE_URL}find-party-member"
+private const val kangba_URL = "${BASE_URL}kangba"
+private const val teacher_URL = "${BASE_URL}teach"
+private const val NAV_BASE_URL = "${BASE_URL}base"
+private const val courseware_URL = "${BASE_URL}courseware"
+private const val jicengdangjian_URL = "${BASE_URL}basic-party-building"
+private const val party_URL = "${BASE_URL}party"
 
 internal sealed interface TvTabDestination {
     data object NativeHome : TvTabDestination
@@ -55,5 +56,6 @@ internal val TV_TABS = listOf(
     TvTabSpec("师资库", 0.80f, TvTabDestination.Web(teacher_URL)),
     TvTabSpec("阵地库", 0.80f, TvTabDestination.Web(NAV_BASE_URL)),
     TvTabSpec("课件库", 0.80f, TvTabDestination.Web(courseware_URL)),
+    TvTabSpec("基层党建", 0.80f, TvTabDestination.Web(jicengdangjian_URL)),
     TvTabSpec("我的党支部", 1.10f, TvTabDestination.Web(party_URL))
 )
