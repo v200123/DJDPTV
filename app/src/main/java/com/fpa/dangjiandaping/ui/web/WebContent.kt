@@ -14,6 +14,7 @@ import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -26,6 +27,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -34,7 +36,8 @@ private const val FOCUS_LOG_TAG = "FocusTrace"
 
 private class WebFocusBridge(
     private val webView: WebView,
-    private val onRequestNativeFocus: () -> Unit
+    private val onRequestNativeFocus: () -> Unit,
+    private val onShowNewsDetail: (String) -> Unit
 ) {
     @JavascriptInterface
     fun requestPreviousTabFocus() {
@@ -46,6 +49,20 @@ private class WebFocusBridge(
             webView.clearFocus()
             onRequestNativeFocus()
         }
+    }
+
+    @JavascriptInterface
+    fun showNewsDetail(newsJson: String) {
+        Log.d(FOCUS_LOG_TAG, "H5 called showNewsDetail")
+        webView.post {
+            webView.clearFocus()
+            onShowNewsDetail(newsJson)
+        }
+    }
+
+    @JavascriptInterface
+    fun openNewsDetail(newsJson: String) {
+        showNewsDetail(newsJson)
     }
 }
 
@@ -68,27 +85,30 @@ internal fun WebContent(
         return
     }
 
-    var createWebView by remember { mutableStateOf(false) }
+//    var createWebView by remember { mutableStateOf(false) }
     var loadingUrl by remember { mutableStateOf<String?>(url) }
+    var newsDetail by remember(url) { mutableStateOf<NewsDetail?>(null) }
 
-    LaunchedEffect(Unit) {
-        // WebView 首次初始化较重，至少让顶部原生界面先完成一帧绘制。
-        withFrameNanos { }
-        withFrameNanos { }
-        createWebView = true
-    }
+//    LaunchedEffect(Unit) {
+//        // WebView 首次初始化较重，至少让顶部原生界面先完成一帧绘制。
+//        withFrameNanos { }
+//        withFrameNanos { }
+//        createWebView = true
+//    }
     LaunchedEffect(url) {
         loadingUrl = url
     }
+    LaunchedEffect(active) {
+        if (!active) newsDetail = null
+    }
 
-    Box(modifier = modifier.background(ComposeColor.Black)) {
-        if (createWebView) {
+    Box(modifier = modifier) {
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { context ->
                     WebView(context).apply {
 
-                        visibility = if (active) View.VISIBLE else View.GONE
+                        isActivated = active
                         isFocusable = active
                         isFocusableInTouchMode = active
                         if (!active) {
@@ -101,7 +121,21 @@ internal fun WebContent(
                             )
                         }
                         addJavascriptInterface(
-                            WebFocusBridge(this, onRequestNativeFocus),
+                            WebFocusBridge(
+                                webView = this,
+                                onRequestNativeFocus = onRequestNativeFocus,
+                                onShowNewsDetail = { newsJson ->
+                                    runCatching { parseNewsDetail(newsJson) }
+                                        .onSuccess { newsDetail = it }
+                                        .onFailure { error ->
+                                            Log.e(
+                                                FOCUS_LOG_TAG,
+                                                "Unable to parse news detail JSON",
+                                                error
+                                            )
+                                        }
+                                }
+                            ),
                             "AndroidFocusBridge"
                         )
                         setOnKeyListener { view, keyCode, event ->
@@ -172,17 +206,20 @@ internal fun WebContent(
                     }
                 },
                 update = { view ->
-                    val targetVisibility = if (active) View.VISIBLE else View.INVISIBLE
-                    if (view.visibility != targetVisibility) {
-                        view.visibility = targetVisibility
-                        view.isFocusable = active
-                        view.isFocusableInTouchMode = active
+                    if (view.isActivated != active) {
+                        view.isActivated = active
                         if (active) {
                             view.onResume()
                         } else {
                             view.clearFocus()
                             view.onPause()
                         }
+                    }
+                    val webViewInteractive = active && newsDetail == null
+                    view.isFocusable = webViewInteractive
+                    view.isFocusableInTouchMode = webViewInteractive
+                    if (!webViewInteractive && view.hasFocus()) {
+                        view.clearFocus()
                     }
 
                     if (view.tag != url) {
@@ -207,12 +244,19 @@ internal fun WebContent(
                     view.destroy()
                 }
             )
-        }
 
-        if (active && (!createWebView || loadingUrl != null)) {
+
+        if (active &&  loadingUrl != null) {
             WebContentPlaceholder(
                 message = "页面加载中…",
                 modifier = Modifier.fillMaxSize()
+            )
+        }
+
+        newsDetail?.let { detail ->
+            NewsDetailDialog(
+                news = detail,
+                onDismiss = { newsDetail = null }
             )
         }
     }
@@ -224,12 +268,12 @@ private fun WebContentPlaceholder(
     modifier: Modifier = Modifier
 ) {
     Box(
-        modifier = modifier.background(ComposeColor(0xFF171717)),
+        modifier = modifier.background(ComposeColor.White),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = message,
-            color = ComposeColor(0xFFBDBDBD)
+            color = ComposeColor.Black
         )
     }
 }

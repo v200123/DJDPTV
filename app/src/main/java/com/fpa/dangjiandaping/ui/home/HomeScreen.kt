@@ -13,6 +13,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
@@ -81,12 +82,12 @@ private data class PartyStat(@DrawableRes val icon: Int, val title: String, val 
 
 private val partyStats = listOf(
     PartyStat(R.drawable.ic_home_dangjian_nongcun, "农村党建", 126),
-    PartyStat(R.drawable.ic_home_dangjian_nongcun, "城市社区", 54),
-    PartyStat(R.drawable.ic_home_dangjian_nongcun, "机关党建", 105),
-    PartyStat(R.drawable.ic_home_dangjian_nongcun, "事业单位", 126),
-    PartyStat(R.drawable.ic_home_dangjian_nongcun, "企业党建", 26),
-    PartyStat(R.drawable.ic_home_dangjian_nongcun, "新兴领域", 154),
-    PartyStat(R.drawable.ic_home_dangjian_nongcun, "党员教育动态", 105),
+    PartyStat(R.drawable.ic_home_chengshishequ, "城市社区", 54),
+    PartyStat(R.drawable.ic_home_jiguandangjian, "机关党建", 105),
+    PartyStat(R.drawable.ic_home_shiyedanwei, "事业单位", 126),
+    PartyStat(R.drawable.ic_home_qiyedangjian, "企业党建", 26),
+    PartyStat(R.drawable.ic_home_xinxinglingyu, "新兴领域", 154),
+    PartyStat(R.drawable.ic_home_dangyuanjiaoyu, "党员教育动态", 105),
 )
 
 private data class CadreTask(val name: String, val duty: String, val date: String)
@@ -621,13 +622,13 @@ private fun FocusableAction(
 
 @Composable
 private fun PartyWorkPanel(modifier: Modifier = Modifier) {
-    HomePanel(modifier) {
+    HomePanel(modifier.focusGroup()) {
         SectionTitle(R.drawable.ic_home_jiceng)
         Spacer(Modifier.height(3.dp))
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1.08f),
+                ,
             verticalArrangement = Arrangement.SpaceEvenly,
         ) {
             Row(Modifier.fillMaxWidth()) {
@@ -645,7 +646,15 @@ private fun PartyWorkPanel(modifier: Modifier = Modifier) {
 
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f)) {  SectionTitle(R.drawable.ic_home_ganburenmian) }
-            Text("更多 >>", color = Color.White, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+            PartyPanelFocusableItem {
+                Text(
+                    "更多 >>",
+                    color = Color.White,
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+                )
+            }
         }
         Spacer(Modifier.height(2.dp))
         Column(
@@ -653,27 +662,33 @@ private fun PartyWorkPanel(modifier: Modifier = Modifier) {
             verticalArrangement = Arrangement.SpaceEvenly,
         ) {
             cadreTasks.forEach { task ->
-                Row(
+                PartyPanelFocusableItem(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Box(Modifier.size(5.dp).background(Color(0xFFF6CD8B)))
-                    Text(
-                        task.name,
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(start = 8.dp).width(76.dp),
-                    )
-                    Text(
-                        task.duty,
-                        color = Color.White,
-                        fontSize = 11.sp,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f),
-                    )
-                    Text(task.date, color = Color.White, fontSize = 10.sp)
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp, vertical = 2.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Box(Modifier.size(5.dp).background(Color(0xFFF6CD8B)))
+                        Text(
+                            task.name,
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.padding(start = 8.dp).width(76.dp),
+                        )
+                        Text(
+                            task.duty,
+                            color = Color.White,
+                            fontSize = 11.sp,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Text(task.date, color = Color.White, fontSize = 10.sp)
+                    }
                 }
             }
         }
@@ -682,29 +697,57 @@ private fun PartyWorkPanel(modifier: Modifier = Modifier) {
 
 @Composable
 private fun PartyStatItem(stat: PartyStat, modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-        verticalAlignment = Alignment.CenterVertically,
+    PartyPanelFocusableItem(
+        modifier = modifier,
     ) {
-        Image(painterResource(stat.icon), contentDescription = "", contentScale = ContentScale.Fit, modifier = Modifier.size(42.dp,40.dp))
-        Spacer(Modifier.width(7.dp))
-        Column {
-            Text(
-                stat.title,
-                color = Color(0xFFF8EAEA),
-                fontSize = 11.sp,
-                maxLines = 1,
-            )
-            Row(verticalAlignment = Alignment.Bottom) {
-                Text(buildAnnotatedString {
-                        append("${stat.count}")
-                        withStyle(SpanStyle(fontSize = 10.sp)){
-                            append("篇")
+        Row(
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Image(painterResource(stat.icon), contentDescription = "", contentScale = ContentScale.Fit, modifier = Modifier.size(42.dp,40.dp))
+            Spacer(Modifier.width(7.dp))
+            Column {
+                Text(
+                    stat.title,
+                    color = Color(0xFFF8EAEA),
+                    fontSize = 11.sp,
+                    maxLines = 1,
+                )
+                Row(verticalAlignment = Alignment.Bottom) {
+                    Text(buildAnnotatedString {
+                            append("${stat.count}")
+                            withStyle(SpanStyle(fontSize = 10.sp)){
+                                append("篇")
+                            }
                         }
-                    }
-                    , color = Color(0xFFF6CD8B), fontSize = 14.sp)
+                        , color = Color(0xFFF6CD8B), fontSize = 14.sp)
+                }
             }
         }
+    }
+}
+
+@Composable
+private fun PartyPanelFocusableItem(
+    modifier: Modifier = Modifier,
+    onClick: () -> Unit = {},
+    content: @Composable () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val scale by animateFloatAsState(if (focused) 1.04f else 1f, label = "partyPanelItemScale")
+    val shape = RoundedCornerShape(6.dp)
+
+    Box(
+        modifier = modifier
+            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .clip(shape)
+            .background(if (focused) Color(0x33FFFFFF) else Color.Transparent)
+            .then(if (focused) Modifier.border(2.dp, Gold, shape) else Modifier)
+            .onFocusChanged { focused = it.isFocused }
+            .clickable(onClick = onClick)
+            .focusable(),
+    ) {
+        content()
     }
 }
 

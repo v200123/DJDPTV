@@ -5,6 +5,7 @@ import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -58,7 +59,7 @@ internal fun rememberTvTabFocusRequesters(): List<FocusRequester> =
     remember { List(TV_TABS.size) { FocusRequester() } }
 
 @Composable
-internal fun NativeHeader(
+fun NativeHeader(
     selectedTab: Int,
     focusedTab: Int,
     tabFocusRequesters: List<FocusRequester>,
@@ -67,15 +68,14 @@ internal fun NativeHeader(
     modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = modifier.height(33.dp)
+        modifier = modifier
     ) {
-//        HeaderBrandRow(
-//            modifier = Modifier
-//                .fillMaxWidth()
-//                .weight(0.54f)
-//                .padding(horizontal = 28.dp)
-//        )
-//        HeaderDivider()
+        HeaderBrandRow(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 28.dp)
+        )
+        HeaderDivider()
         HeaderTabRow(
             selectedTab = selectedTab,
             focusedTab = focusedTab,
@@ -90,26 +90,10 @@ internal fun NativeHeader(
 
 @Composable
 private fun HeaderBrandRow(modifier: Modifier = Modifier) {
-    Row(
+    Box(
         modifier = modifier,
-        verticalAlignment = Alignment.CenterVertically
+        contentAlignment = Alignment.TopEnd
     ) {
-        Text(
-            text = "☭",
-            color = Color(0xFFFFD36A),
-            fontSize = 34.sp,
-            fontWeight = FontWeight.Black
-        )
-        Spacer(Modifier.width(10.dp))
-        Text(
-            text = "康巴党旗红数字党建平台",
-            color = Color(0xFFFFD36A),
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis
-        )
-        Spacer(Modifier.weight(1f))
         Column(horizontalAlignment = Alignment.End) {
             Text("中共甘孜州委组织部", color = Color(0xFFFFD186), fontSize = 12.sp)
             Text(currentDateText(), color = Color(0xFFFFD186), fontSize = 10.sp)
@@ -119,19 +103,10 @@ private fun HeaderBrandRow(modifier: Modifier = Modifier) {
 
 @Composable
 private fun HeaderDivider() {
-    Box(
+    Spacer(
         Modifier
             .fillMaxWidth()
-            .height(1.dp)
-            .background(
-                Brush.horizontalGradient(
-                    listOf(
-                        Color.Transparent,
-                        Color(0xFFFFD36A),
-                        Color.Transparent
-                    )
-                )
-            )
+            .height(36.dp)
     )
 }
 
@@ -148,8 +123,10 @@ private fun HeaderTabRow(
 
     Row(
         modifier = modifier
+            .padding(51.dp,0.dp)
             .focusRestorer()
             .onFocusChanged { tabRowHasFocus = it.hasFocus },
+        horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
         TV_TABS.forEachIndexed { index, tab ->
@@ -157,8 +134,6 @@ private fun HeaderTabRow(
             val retainedFocus = !tabRowHasFocus && focusedTab == index
             Box(
                 modifier = Modifier
-                    .weight(tab.widthWeight)
-                    .fillMaxHeight()
                     .focusRequester(tabFocusRequesters[index])
                     .onFocusChanged { focusState ->
                         if (focusState.isFocused) {
@@ -189,7 +164,9 @@ private fun TabBrushIndicator(modifier: Modifier = Modifier) {
         painter = painterResource(R.drawable.ic_top_tab_ind),
         contentDescription = null,
         contentScale = ContentScale.None,
-        modifier = modifier.size(width = 53.dp, height = 9.dp).offset(0.dp,2.dp)
+        modifier = modifier
+            .size(width = 53.dp, height = 9.dp)
+            .offset(y = 8.dp)
     )
 }
 
@@ -201,19 +178,16 @@ private fun TvTabContent(
     retainedFocus: Boolean
 ) {
     val emphasized = focused || retainedFocus
-    val tabScale by animateFloatAsState(
-        targetValue = if (focused) 1.06f else 1f,
-        label = "tabScale"
-    )
+//    val tabScale by animateFloatAsState(
+//        targetValue = if (focused) 1.06f else 1f,
+//        label = "tabScale"
+//    )
     Box(
         modifier = Modifier
-            .fillMaxSize()
     ) {
         Box(
             modifier = Modifier
-                .align(Alignment.Center)
-                .fillMaxWidth()
-               ,
+                .align(Alignment.Center),
             contentAlignment = Alignment.Center
         ) {
             Text(
@@ -225,7 +199,7 @@ private fun TvTabContent(
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.scale(tabScale)
+//                modifier = Modifier.scale(tabScale)
             )
         }
 
