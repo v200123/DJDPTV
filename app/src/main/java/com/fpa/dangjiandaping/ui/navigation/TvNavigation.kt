@@ -3,12 +3,13 @@ package com.fpa.dangjiandaping.ui.navigation
 import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.Serializable
 
-private const val BASE_URL = "http://192.168.20.233:5173/xiaoyuTv/#/"
+//private const val BASE_URL = "http://192.168.20.233:5173/xiaoyuTv/#/"
+private const val BASE_URL = "http://192.168.20.118:5173/xiaoyuTv/#/"
 
 private const val HOME_WEB_URL = "$BASE_URL"
 private const val PARTY_MEMBER_URL = "${BASE_URL}find-party-member"
 private const val kangba_URL = "${BASE_URL}kangba"
-private const val teacher_URL = "${BASE_URL}teach"
+private const val teacher_URL = "${BASE_URL}teacher"
 private const val NAV_BASE_URL = "${BASE_URL}base"
 private const val courseware_URL = "${BASE_URL}courseware"
 private const val jicengdangjian_URL = "${BASE_URL}basic-party-building"

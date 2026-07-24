@@ -159,9 +159,13 @@ private fun HeaderTabRow(
                             Log.d(FOCUS_LOG_TAG, "NativeTab[$index][${tab.title}] FOCUSED")
                         } }
                     .onPreviewKeyEvent { event ->
-                        val moveToContent =
-                            event.key == Key.DirectionDown &&
-                                event.type == KeyEventType.KeyDown
+                        val moveToContent = event.type == KeyEventType.KeyDown &&
+                            event.key in setOf(
+                                Key.DirectionDown,
+                                Key.Enter,
+                                Key.NumPadEnter,
+                                Key.DirectionCenter,
+                            )
                         if (moveToContent) {
                             onTabDown(index)
                             true

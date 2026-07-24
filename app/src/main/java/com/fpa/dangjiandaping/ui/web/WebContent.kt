@@ -17,18 +17,16 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color as ComposeColor
-import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -42,7 +40,9 @@ private const val WEB_LOG_TAG = "WebContent"
 private class WebFocusBridge(
     private val webView: WebView,
     private val onRequestNativeFocus: () -> Unit,
-    private val onShowNewsDetail: (String) -> Unit
+    private val onShowNewsDetail: (String) -> Unit,
+    private val onPlayVideo: (String) -> Unit,
+    private val onShowWebViewUrl: (String) -> Unit,
 ) {
     @JavascriptInterface
     fun requestPreviousTabFocus() {
@@ -58,7 +58,7 @@ private class WebFocusBridge(
 
     @JavascriptInterface
     fun showNewsDetail(newsJson: String) {
-        Log.d(FOCUS_LOG_TAG, "H5 called showNewsDetail")
+        Log.d(FOCUS_LOG_TAG, "H5 called showNewsDetail,收到的数据为:$newsJson")
         webView.post {
             webView.clearFocus()
             onShowNewsDetail(newsJson)
@@ -69,13 +69,29 @@ private class WebFocusBridge(
     fun openNewsDetail(newsJson: String) {
         showNewsDetail(newsJson)
     }
+
+    @JavascriptInterface
+    fun playVideo(videoUrl: String) {
+        Log.d(WEB_LOG_TAG, "H5 called playVideo: $videoUrl")
+        webView.post {
+            onPlayVideo(videoUrl.trim())
+        }
+    }
+
+    @JavascriptInterface
+    fun handleNewsClick(url: String) {
+        Log.d(WEB_LOG_TAG, "H5 called showWebViewUrl: $url")
+        webView.post {
+            onShowWebViewUrl(url.trim())
+        }
+    }
 }
 
 @SuppressLint("SetJavaScriptEnabled")
 @Composable
 internal fun WebContent(
     url: String,
-//    active: Boolean,
+    active: Boolean,
     onCreated: (WebView) -> Unit,
     onReleased: (WebView) -> Unit,
     onCanGoBackChanged: (Boolean) -> Unit,
@@ -100,12 +116,9 @@ internal fun WebContent(
 //        withFrameNanos { }
 //        createWebView = true
 //    }
-//    LaunchedEffect(active) {
-//        if (!active) newsDetail = null
-//    }
-
     Box(
         modifier = modifier
+            .alpha(if (active) 1f else 0f)
             .focusProperties {
                 onExit = {
                     if (requestedFocusDirection == FocusDirection.Up) {
@@ -125,6 +138,10 @@ internal fun WebContent(
                         Log.i(WEB_LOG_TAG, "WebView remote debugging enabled")
                     }
                     WebView(context).apply {
+                        layoutParams = ViewGroup.LayoutParams(
+                            ViewGroup.LayoutParams.MATCH_PARENT,
+                            ViewGroup.LayoutParams.MATCH_PARENT
+                        )
 //                        isActivated = active
 //                        isFocusable = active
 //                        isFocusableInTouchMode = active
@@ -151,7 +168,21 @@ internal fun WebContent(
                                                 error
                                             )
                                         }
-                                }
+                                },
+                                onPlayVideo = { requestedUrl ->
+                                    if (requestedUrl.isNotEmpty()) {
+                                        context.startActivity(
+                                            FullscreenVideoActivity.newIntent(context, requestedUrl)
+                                        )
+                                    }
+                                },
+                                onShowWebViewUrl = { requestedUrl ->
+                                    if (requestedUrl.isNotEmpty()) {
+                                        context.startActivity(
+                                            FullscreenWebViewActivity.newIntent(context, requestedUrl)
+                                        )
+                                    }
+                                },
                             ),
                             "AndroidFocusBridge"
                         )
@@ -190,13 +221,11 @@ internal fun WebContent(
                                 Log.i(WEB_LOG_TAG, "onPageCommitVisible: $url")
                                 loadingUrl = null
                             }
-
                             override fun onPageFinished(view: WebView, url: String?) {
                                 super.onPageFinished(view, url)
                                 Log.i(WEB_LOG_TAG, "onPageFinished: $url")
                                 loadingUrl = null
                             }
-
                             override fun doUpdateVisitedHistory(
                                 view: WebView,
                                 url: String?,
@@ -215,8 +244,8 @@ internal fun WebContent(
                             cacheMode = WebSettings.LOAD_DEFAULT
                             useWideViewPort = true
                             loadWithOverviewMode = true
-                            builtInZoomControls = true
-                            displayZoomControls = true
+                            builtInZoomControls = false
+                            displayZoomControls = false
                             userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 Edg/150.0.0.0"
                             setSupportZoom(true)
                         }
@@ -227,18 +256,15 @@ internal fun WebContent(
                     }
                 },
                 update = { view ->
-//                    if (view.isActivated != active) {
-//                        view.isActivated = active
-//                        if (active) {
-//                            view.onResume()
-//                        } else {
-//                            view.clearFocus()
-//                            view.onPause()
-//                        }
-//                    }
-                    val webViewInteractive = true
+                    view.visibility = if (active) View.VISIBLE else View.INVISIBLE
+                    view.isActivated = active
+                    val webViewInteractive = active
                     view.isFocusable = webViewInteractive
                     view.isFocusableInTouchMode = webViewInteractive
+                    if (active) {
+                        onCreated(view)
+                        onCanGoBackChanged(view.canGoBack())
+                    }
                     if (!webViewInteractive && view.hasFocus()) {
                         view.clearFocus()
                     }
@@ -281,6 +307,7 @@ internal fun WebContent(
                 onDismiss = { newsDetail = null }
             )
         }
+
     }
 }
 
@@ -311,6 +338,7 @@ private fun WebContentPreview() {
     MaterialTheme {
         WebContent(
             url = "https://www.baidu.com",
+            active = true,
             onCreated = {},
             onReleased = {},
             onCanGoBackChanged = {},

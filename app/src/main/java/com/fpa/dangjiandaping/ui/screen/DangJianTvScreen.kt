@@ -6,7 +6,9 @@ import android.content.ContextWrapper
 import android.view.SoundEffectConstants
 import android.view.View
 import android.webkit.WebView
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -25,6 +27,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
+import androidx.compose.ui.zIndex
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -37,9 +40,7 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
 import androidx.navigationevent.compose.rememberNavigationEventDispatcherOwner
-import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
-import androidx.navigation3.ui.NavDisplay
 import androidx.tv.material3.MaterialTheme
 import com.fpa.dangjiandaping.R
 import com.fpa.dangjiandaping.ui.header.NativeHeader
@@ -117,6 +118,8 @@ fun DangJianTvScreen() {
         }
     }
 
+    BackHandler(onBack = ::handleBack)
+
     LaunchedEffect(isInPreview) {
         if (!isInPreview) {
             tabFocusRequesters[lastFocusedTab].requestFocus()
@@ -158,7 +161,13 @@ fun DangJianTvScreen() {
                 selectedTab = selectedTab,
                 focusedTab = lastFocusedTab,
                 tabFocusRequesters = tabFocusRequesters,
-                onTabFocused = { lastFocusedTab = it },
+                onTabFocused = { tabIndex ->
+                    if (tabIndex == selectedTab) {
+                        lastFocusedTab = tabIndex
+                    } else {
+                        activateTab(tabIndex, moveFocusToContent = false)
+                    }
+                },
                 onTabSelected = { tabIndex -> activateTab(tabIndex, moveFocusToContent = false) },
                 onTabDown = { tabIndex -> activateTab(tabIndex, moveFocusToContent = true) },
                 modifier = Modifier
@@ -167,51 +176,46 @@ fun DangJianTvScreen() {
             )
             Spacer(modifier = Modifier.height(12.dp))
 
-            NavDisplay(
-                backStack = backStack,
-                onBack = ::handleBack,
-                entryProvider = entryProvider {
-                    entry<HomeRoute> {
-                        HomeScreen(
-                            modifier = Modifier.fillMaxSize(),
-                            contentFocusRequester =
-                                if (currentRoute == HomeRoute) contentFocusRequester else null,
-                            onRequestTabFocus = ::requestSelectedTabFocus,
-                        )
-                    }
-                    entry<WebRoute> { route ->
-                        WebContent(
-                            url = route.url,
-//                            active = currentRoute == route,
-                            onCreated = { createdView ->
-                                if (backStack.lastOrNull() == route) {
-                                    webView = createdView
-                                }
-                            },
-                            onReleased = { releasedView ->
-                                if (webView === releasedView) {
-                                    webView = null
-                                }
-                            },
-                            onCanGoBackChanged = { canGoBack ->
-                                if (backStack.lastOrNull() == route) {
-                                    canWebViewGoBack = canGoBack
-                                }
-                            },
-                            onRequestNativeFocus = {
-                                requestSelectedTabFocus()
-                            },
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(50.dp,0.dp),
-                        )
-                    }
-                },
+            Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
                     .clipToBounds(),
-            )
+            ) {
+                val homeIsActive = currentRoute == HomeRoute
+                if (homeIsActive) {
+                    HomeScreen(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .zIndex(1f),
+                        contentFocusRequester = contentFocusRequester,
+                        onRequestTabFocus = ::requestSelectedTabFocus,
+                    )
+                }
+
+                TV_TABS.forEachIndexed { tabIndex, tab ->
+                    val route = tab.destination.toRoute(tabIndex) as? WebRoute ?: return@forEachIndexed
+                    val webIsActive = currentRoute == route
+                    WebContent(
+                        url = route.url,
+                        active = webIsActive,
+                        onCreated = { createdView ->
+                            if (currentRoute == route) webView = createdView
+                        },
+                        onReleased = { releasedView ->
+                            if (webView === releasedView) webView = null
+                        },
+                        onCanGoBackChanged = { canGoBack ->
+                            if (currentRoute == route) canWebViewGoBack = canGoBack
+                        },
+                        onRequestNativeFocus = ::requestSelectedTabFocus,
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(50.dp, 0.dp)
+                            .zIndex(if (webIsActive) 1f else 0f),
+                    )
+                }
+            }
         }
     }
 }
