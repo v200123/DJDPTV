@@ -79,7 +79,7 @@ private class WebFocusBridge(
     }
 
     @JavascriptInterface
-    fun handleNewsClick(url: String) {
+    fun showWebViewUrl(url: String) {
         Log.d(WEB_LOG_TAG, "H5 called showWebViewUrl: $url")
         webView.post {
             onShowWebViewUrl(url.trim())

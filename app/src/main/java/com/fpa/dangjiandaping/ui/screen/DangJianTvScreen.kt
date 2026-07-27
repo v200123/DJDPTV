@@ -46,10 +46,13 @@ import com.fpa.dangjiandaping.R
 import com.fpa.dangjiandaping.ui.header.NativeHeader
 import com.fpa.dangjiandaping.ui.header.rememberTvTabFocusRequesters
 import com.fpa.dangjiandaping.ui.home.HomeScreen
+import com.fpa.dangjiandaping.ui.home.defaultPartyStats
+import com.fpa.dangjiandaping.ui.home.fetchPartyStats
 import com.fpa.dangjiandaping.ui.navigation.HomeRoute
 import com.fpa.dangjiandaping.ui.navigation.TV_TABS
 import com.fpa.dangjiandaping.ui.navigation.TvRoute
 import com.fpa.dangjiandaping.ui.navigation.WebRoute
+import com.fpa.dangjiandaping.ui.navigation.partyBuildingRoute
 import com.fpa.dangjiandaping.ui.navigation.toRoute
 import com.fpa.dangjiandaping.ui.web.WebContent
 
@@ -69,6 +72,8 @@ fun DangJianTvScreen() {
     var webView by remember { mutableStateOf<WebView?>(null) }
     var canWebViewGoBack by remember { mutableStateOf(false) }
     var pendingContentFocusRoute by remember { mutableStateOf<TvRoute?>(null) }
+    var pendingTabFocusIndex by remember { mutableStateOf<Int?>(null) }
+    var partyStats by remember { mutableStateOf(defaultPartyStats) }
 
     val tabFocusRequesters = rememberTvTabFocusRequesters()
     val contentFocusRequester = remember { FocusRequester() }
@@ -87,15 +92,31 @@ fun DangJianTvScreen() {
         tabFocusRequesters[selectedTab].requestFocus(FocusDirection.Up)
     }
 
-    fun activateTab(tabIndex: Int, moveFocusToContent: Boolean) {
+    fun activateRoute(tabIndex: Int, targetRoute: TvRoute, moveFocusToContent: Boolean) {
         lastFocusedTab = tabIndex
-        val targetRoute = TV_TABS[tabIndex].destination.toRoute(tabIndex)
         if (targetRoute != currentRoute) {
             webView = null
             replaceRoute(targetRoute)
         }
         pendingContentFocusRoute = if (moveFocusToContent) targetRoute else null
         rootView.playSoundEffect(SoundEffectConstants.CLICK)
+    }
+
+    fun activateTab(tabIndex: Int, moveFocusToContent: Boolean) {
+        activateRoute(
+            tabIndex = tabIndex,
+            targetRoute = TV_TABS[tabIndex].destination.toRoute(tabIndex),
+            moveFocusToContent = moveFocusToContent,
+        )
+    }
+
+    fun openPartyBuilding(channelId: Int) {
+        activateRoute(
+            tabIndex = 6,
+            targetRoute = partyBuildingRoute(channelId),
+            moveFocusToContent = false,
+        )
+        pendingTabFocusIndex = 6
     }
 
     fun handleBack() {
@@ -123,6 +144,24 @@ fun DangJianTvScreen() {
     LaunchedEffect(isInPreview) {
         if (!isInPreview) {
             tabFocusRequesters[lastFocusedTab].requestFocus()
+        }
+    }
+
+    LaunchedEffect(selectedTab, pendingTabFocusIndex) {
+        if (pendingTabFocusIndex == selectedTab) {
+            withFrameNanos { }
+            tabFocusRequesters[selectedTab].requestFocus(FocusDirection.Up)
+            pendingTabFocusIndex = null
+        }
+    }
+
+    LaunchedEffect(Unit) {
+        fetchPartyStats()?.let { fetchedCounts ->
+            partyStats = defaultPartyStats.map { stat ->
+                fetchedCounts[stat.title]?.let { update ->
+                    stat.copy(count = update.newsCount, channelId = update.channelId)
+                } ?: stat
+            }
         }
     }
 
@@ -162,7 +201,10 @@ fun DangJianTvScreen() {
                 focusedTab = lastFocusedTab,
                 tabFocusRequesters = tabFocusRequesters,
                 onTabFocused = { tabIndex ->
-                    if (tabIndex == selectedTab) {
+                    if (pendingContentFocusRoute != null ||
+                        pendingTabFocusIndex != null ||
+                        tabIndex == selectedTab
+                    ) {
                         lastFocusedTab = tabIndex
                     } else {
                         activateTab(tabIndex, moveFocusToContent = false)
@@ -188,6 +230,7 @@ fun DangJianTvScreen() {
                         modifier = Modifier
                             .fillMaxSize()
                             .zIndex(1f),
+                        partyStats = partyStats,
                         contentFocusRequester = contentFocusRequester,
                         onRequestTabFocus = ::requestSelectedTabFocus,
                     )

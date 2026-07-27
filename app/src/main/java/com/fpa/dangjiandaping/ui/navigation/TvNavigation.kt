@@ -38,6 +38,11 @@ internal fun TvTabDestination.toRoute(tabIndex: Int): TvRoute = when (this) {
     is TvTabDestination.Web -> WebRoute(tabIndex = tabIndex, url = url)
 }
 
+internal fun partyBuildingRoute(channelId: Int): WebRoute = WebRoute(
+    tabIndex = 6,
+    url = "$jicengdangjian_URL?id=$channelId",
+)
+
 internal data class TvTabSpec(
     val title: String,
     val widthWeight: Float,

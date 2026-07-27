@@ -8,7 +8,9 @@ plugins {
 android {
     namespace = "com.fpa.dangjiandaping"
     compileSdk = 36
-
+    lint {
+        baseline = file("lint-baseline.xml")
+    }
     defaultConfig {
         applicationId = "com.fpa.dangjiandaping"
         minSdk = 23
