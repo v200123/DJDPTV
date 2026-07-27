@@ -27,6 +27,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
@@ -41,6 +42,7 @@ import androidx.compose.ui.input.key.key
 import androidx.compose.ui.input.key.onPreviewKeyEvent
 import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.Layout
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -175,8 +177,10 @@ private fun HeaderTabRow(
                     }
                     .selectable(
                         selected = selectedTab == index,
+                        interactionSource = null,
                         onClick = { onTabSelected(index) },
-                        role = Role.Tab
+                        role = Role.Tab,
+                        indication = null,
                     ),
                 contentAlignment = Alignment.Center
             ) {
@@ -218,23 +222,11 @@ private fun TvTabContent(
     Box(
         modifier = Modifier
     ) {
-        Box(
-            modifier = Modifier
-                .align(Alignment.Center),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = text,
-                color = if (emphasized) Color.White else Color(0xFFEBCACA),
-                fontSize = if (emphasized) 22.sp else 16.sp,
-                fontStyle = if (focused) FontStyle.Italic else FontStyle.Normal,
-                fontWeight = if (emphasized) FontWeight.Bold else FontWeight.Medium,
-                textAlign = TextAlign.Center,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-//                modifier = Modifier.scale(tabScale)
-            )
-        }
+        StableTabLabel(
+            text = text,
+            emphasized = emphasized,
+            focused = focused,
+        )
 
         if (emphasized) {
             TabBrushIndicator(
@@ -243,6 +235,8 @@ private fun TvTabContent(
         }
 
         if (recommended) {
+            val badgeOffsetX = if (emphasized) 12.dp else 3.dp
+            val badgeOffsetY = if (emphasized) (-7).dp else (-3).dp
             Text(
                 text = "推荐",
                 color = Color(0xFFFFD36A),
@@ -250,11 +244,63 @@ private fun TvTabContent(
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier
                     .align(Alignment.TopEnd)
-                    .offset(x = 3.dp, y = (-3).dp)
+                    .offset(x = badgeOffsetX, y = badgeOffsetY)
                     .background(Color(0xFFD91C12), RoundedCornerShape(4.dp))
                     .border(1.dp, Color(0xFFFFD36A), RoundedCornerShape(4.dp))
                     .padding(horizontal = 4.dp, vertical = 1.dp)
             )
+        }
+    }
+}
+
+@Composable
+private fun StableTabLabel(text: String, emphasized: Boolean, focused: Boolean) {
+    Layout(
+        content = {
+            // The normal label determines horizontal placement for every tab.
+            Text(
+                text = text,
+                color = Color.Transparent,
+                fontSize = 16.sp,
+                fontStyle = FontStyle.Normal,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+            )
+            // Retain the maximum height for the visual-scale overflow and indicator.
+            Text(
+                text = text,
+                color = Color.Transparent,
+                fontSize = 22.sp,
+                fontStyle = FontStyle.Italic,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+            )
+            Text(
+                text = text,
+                color = if (emphasized) Color.White else Color(0xFFEBCACA),
+                fontSize = 16.sp,
+                fontStyle = if (focused) FontStyle.Italic else FontStyle.Normal,
+                fontWeight = if (emphasized) FontWeight.Bold else FontWeight.Medium,
+                textAlign = TextAlign.Center,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.graphicsLayer {
+                    val scale = if (emphasized) 22f / 16f else 1f
+                    scaleX = scale
+                    scaleY = scale
+                },
+            )
+        },
+    ) { measurables, constraints ->
+        val normal = measurables[0].measure(constraints)
+        val maximum = measurables[1].measure(constraints)
+        val current = measurables[2].measure(constraints)
+        val height = maximum.height
+
+        layout(normal.width, height) {
+            normal.placeRelative(0, (height - normal.height) / 2)
+            maximum.placeRelative(0, 0)
+            current.placeRelative(0, (height - current.height) / 2)
         }
     }
 }

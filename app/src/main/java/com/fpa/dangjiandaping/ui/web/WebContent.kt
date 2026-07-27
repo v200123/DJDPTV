@@ -142,6 +142,7 @@ internal fun WebContent(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
                         )
+                        setBackgroundColor(Color.TRANSPARENT)
 //                        isActivated = active
 //                        isFocusable = active
 //                        isFocusableInTouchMode = active
@@ -317,12 +318,12 @@ private fun WebContentPlaceholder(
     modifier: Modifier = Modifier
 ) {
     Box(
-        modifier = modifier.background(ComposeColor.White),
+        modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = message,
-            color = ComposeColor.Black
+            color = ComposeColor.White
         )
     }
 }
