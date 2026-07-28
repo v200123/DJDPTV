@@ -3,6 +3,7 @@ package com.fpa.dangjiandaping.ui.screen
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.view.KeyEvent
 import android.view.SoundEffectConstants
 import android.view.View
 import android.webkit.WebView
@@ -177,8 +178,17 @@ fun DangJianTvScreen() {
 
                 is WebRoute -> {
                     webView?.let { currentWebView ->
-                        currentWebView.requestFocus(View.FOCUS_DOWN)
-                        pendingContentFocusRoute = null
+                        withFrameNanos { }
+                        currentWebView.post {
+                            currentWebView.requestFocus(View.FOCUS_DOWN)
+                            currentWebView.dispatchKeyEvent(
+                                KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_DOWN),
+                            )
+                            currentWebView.dispatchKeyEvent(
+                                KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_DOWN),
+                            )
+                            pendingContentFocusRoute = null
+                        }
                     }
                 }
             }

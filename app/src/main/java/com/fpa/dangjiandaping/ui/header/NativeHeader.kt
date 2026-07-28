@@ -234,22 +234,22 @@ private fun TvTabContent(
             )
         }
 
-        if (recommended) {
-            val badgeOffsetX = if (emphasized) 12.dp else 3.dp
-            val badgeOffsetY = if (emphasized) (-7).dp else (-3).dp
-            Text(
-                text = "推荐",
-                color = Color(0xFFFFD36A),
-                fontSize = 9.sp,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier
-                    .align(Alignment.TopEnd)
-                    .offset(x = badgeOffsetX, y = badgeOffsetY)
-                    .background(Color(0xFFD91C12), RoundedCornerShape(4.dp))
-                    .border(1.dp, Color(0xFFFFD36A), RoundedCornerShape(4.dp))
-                    .padding(horizontal = 4.dp, vertical = 1.dp)
-            )
-        }
+//        if (recommended) {
+//            val badgeOffsetX = if (emphasized) 12.dp else 3.dp
+//            val badgeOffsetY = if (emphasized) (-7).dp else (-3).dp
+//            Text(
+//                text = "推荐",
+//                color = Color(0xFFFFD36A),
+//                fontSize = 9.sp,
+//                fontWeight = FontWeight.Bold,
+//                modifier = Modifier
+//                    .align(Alignment.TopEnd)
+//                    .offset(x = badgeOffsetX, y = badgeOffsetY)
+//                    .background(Color(0xFFD91C12), RoundedCornerShape(4.dp))
+//                    .border(1.dp, Color(0xFFFFD36A), RoundedCornerShape(4.dp))
+//                    .padding(horizontal = 4.dp, vertical = 1.dp)
+//            )
+//        }
     }
 }
 

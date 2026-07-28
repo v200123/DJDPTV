@@ -4,6 +4,7 @@ import android.R.attr.foreground
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.net.Uri
 import androidx.activity.compose.BackHandler
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.animateColorAsState
@@ -34,10 +35,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -416,16 +419,40 @@ private fun RuntimeVideoPlayer(
         title = "康巴党旗红",
         autoPlay = false,
     )
+    // GSY 已在应用入口切换到 Exo2/Media3 内核。对 HLS 地址再显式声明格式，
+    // 可避免带 query 参数的 m3u8 链接被错误按普通媒体源解析。
+    LaunchedEffect(controller, videoUrl) {
+        controller.setOverrideExtension(
+            if (isHlsVideoUrl(videoUrl)) "m3u8" else null,
+        )
+    }
     val snapshot by controller.snapshot
     var dragging by remember { mutableStateOf(false) }
     var dragFraction by remember { mutableFloatStateOf(0f) }
+    var surfaceGeneration by remember { mutableStateOf(0) }
+    var rebindSurfaceAfterFullscreen by remember { mutableStateOf(false) }
 
     BackHandler(enabled = controller.isFullscreen && activity != null) {
-        activity?.let { controller.exitFullscreen(it) }
+        activity?.let {
+            controller.exitFullscreen(it)
+            rebindSurfaceAfterFullscreen = true
+        }
+    }
+
+    LaunchedEffect(rebindSurfaceAfterFullscreen) {
+        if (rebindSurfaceAfterFullscreen) {
+            // Let the fullscreen surface finish detaching before attaching a fresh inline one.
+            withFrameNanos { }
+            withFrameNanos { }
+            surfaceGeneration += 1
+            rebindSurfaceAfterFullscreen = false
+        }
     }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
-        GSYPlayerSurface(controller, Modifier.fillMaxSize())
+        key(surfaceGeneration) {
+            GSYPlayerSurface(controller, Modifier.fillMaxSize())
+        }
 
         if (snapshot.state == GSYPlayState.Idle ||
             snapshot.state == GSYPlayState.Preparing ||
@@ -434,22 +461,22 @@ private fun RuntimeVideoPlayer(
             VideoPoster(Modifier.fillMaxSize())
         }
 
-        if (!snapshot.isPlaying) {
-            PlayerRoundButton(
-                label = if (snapshot.state == GSYPlayState.Preparing) "…" else "▶",
-                onClick = controller::togglePlayPause,
-                modifier = Modifier
-                    .align(Alignment.Center)
-                    .size(64.dp)
-                    .then(
-                        if (playFocusRequester != null) {
-                            Modifier.focusRequester(playFocusRequester)
-                        } else {
-                            Modifier
-                        }
-                    ),
-            )
-        }
+//        if (!snapshot.isPlaying) {
+//            PlayerRoundButton(
+//                label = if (snapshot.state == GSYPlayState.Preparing) "…" else "▶",
+//                onClick = controller::togglePlayPause,
+//                modifier = Modifier
+//                    .align(Alignment.Center)
+//                    .size(64.dp)
+//                    .then(
+//                        if (playFocusRequester != null) {
+//                            Modifier.focusRequester(playFocusRequester)
+//                        } else {
+//                            Modifier
+//                        }
+//                    ),
+//            )
+//        }
 
         VideoControlBar(
             isPlaying = snapshot.isPlaying,
@@ -468,73 +495,22 @@ private fun RuntimeVideoPlayer(
                 dragging = false
             },
             onFullscreen = { activity?.let { controller.enterFullscreen(it) } },
+            primaryControlFocusRequester =
+                if (snapshot.isPlaying) playFocusRequester else null,
             fullscreenFocusRequester = fullscreenFocusRequester,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
 }
 
+private fun isHlsVideoUrl(videoUrl: String): Boolean =
+    Uri.parse(videoUrl).path?.endsWith(".m3u8", ignoreCase = true) == true
+
 @Composable
 private fun VideoPoster(modifier: Modifier = Modifier) {
-    Box(
-        modifier = modifier.background(
-            Brush.verticalGradient(
-                listOf(Color(0xFF728ED1), Color(0xFF2B4B8E), Color(0xFF1C2F65)),
-            ),
-        ),
-    ) {
-        Canvas(Modifier.fillMaxSize()) {
-            val w = size.width
-            val h = size.height
-            val farMountains = Path().apply {
-                moveTo(0f, h * 0.62f)
-                lineTo(w * 0.12f, h * 0.36f)
-                lineTo(w * 0.22f, h * 0.54f)
-                lineTo(w * 0.35f, h * 0.24f)
-                lineTo(w * 0.48f, h * 0.55f)
-                lineTo(w * 0.62f, h * 0.32f)
-                lineTo(w * 0.75f, h * 0.58f)
-                lineTo(w * 0.9f, h * 0.30f)
-                lineTo(w, h * 0.54f)
-                lineTo(w, h)
-                lineTo(0f, h)
-                close()
-            }
-            drawPath(farMountains, Color(0xCC244172))
-            val flag = Path().apply {
-                moveTo(0f, h * 0.68f)
-                cubicTo(w * 0.25f, h * 0.42f, w * 0.5f, h * 0.94f, w, h * 0.57f)
-                lineTo(w, h)
-                lineTo(0f, h)
-                close()
-            }
-            drawPath(flag, Brush.verticalGradient(listOf(Color(0xFFE91D2A), Color(0xFF75010B))))
-        }
-
-        Column(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .padding(bottom = 34.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
-        ) {
-//            Text("☭", color = Gold, fontSize = 44.sp, fontWeight = FontWeight.Black)
-            Text(
-                "康巴党旗红",
-                color = BrightGold,
-                fontSize = 28.sp,
-                fontWeight = FontWeight.Black,
-            )
-//            Text(
-//                "正在直播：全省党员教育电视片展播",
-//                color = Color.White.copy(alpha = 0.9f),
-//                fontSize = 11.sp,
-//                modifier = Modifier
-//                    .padding(top = 5.dp)
-//                    .background(Color(0x66000000), RoundedCornerShape(3.dp))
-//                    .padding(horizontal = 18.dp, vertical = 4.dp),
-//            )
-        }
-    }
+    Image(painterResource(R.drawable.video_image)
+        , contentDescription = ""
+        , modifier = modifier, contentScale = ContentScale.FillBounds)
 }
 
 @Composable
@@ -573,6 +549,7 @@ private fun VideoControlBar(
     onDragChanged: (Float) -> Unit,
     onDragFinished: (Float) -> Unit,
     onFullscreen: () -> Unit,
+    primaryControlFocusRequester: FocusRequester? = null,
     fullscreenFocusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -593,12 +570,24 @@ private fun VideoControlBar(
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        VideoBarButton(if (isPlaying) "Ⅱ" else "▶", onTogglePlay)
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.size(7.dp).background(PrimaryRed, CircleShape))
-            Spacer(Modifier.width(5.dp))
-            Text("直播", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-        }
+        VideoBarButton(
+            label = if (isPlaying) "Ⅱ" else "▶",
+            onClick = onTogglePlay,
+            modifier = Modifier
+                .size(30.dp)
+                .then(
+                    if (primaryControlFocusRequester != null) {
+                        Modifier.focusRequester(primaryControlFocusRequester)
+                    } else {
+                        Modifier
+                    }
+                ),
+        )
+//        Row(verticalAlignment = Alignment.CenterVertically) {
+//            Box(Modifier.size(7.dp).background(PrimaryRed, CircleShape))
+//            Spacer(Modifier.width(5.dp))
+//            Text("直播", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+//        }
         SeekBar(
             playedFraction = playedFraction,
             bufferFraction = bufferPercent.coerceIn(0, 100) / 100f,
@@ -786,13 +775,13 @@ private fun PartyWorkPanel(
             PartyPanelFocusableItem(
                 modifier = Modifier.focusProperties { left = fullscreenFocusRequester },
             ) {
-                Text(
-                    "更多 >>",
-                    color = Color.White,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-                )
+//                Text(
+//                    "更多 >>",
+//                    color = Color.White,
+//                    fontSize = 11.sp,
+//                    fontWeight = FontWeight.Bold,
+//                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
+//                )
             }
         }
         Spacer(Modifier.height(2.dp))
