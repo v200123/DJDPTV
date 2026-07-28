@@ -43,6 +43,11 @@ internal fun partyBuildingRoute(channelId: Int): WebRoute = WebRoute(
     url = "$jicengdangjian_URL?id=$channelId",
 )
 
+internal fun coursewareRoute(type: Int): WebRoute = WebRoute(
+    tabIndex = 5,
+    url = "$courseware_URL?type=$type",
+)
+
 internal data class TvTabSpec(
     val title: String,
     val widthWeight: Float,

@@ -15,8 +15,8 @@ android {
         applicationId = "com.fpa.dangjiandaping"
         minSdk = 23
         targetSdk = 33
-        versionCode = 201
-        versionName = "2.0.1"
+        versionCode = 202
+        versionName = "2.0.2"
     }
 
     buildFeatures {
@@ -46,8 +46,6 @@ dependencies {
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.compose.foundation:foundation")
-    implementation("androidx.compose.material:material-icons-core")
-    implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.tv:tv-material:1.1.0")
     implementation("androidx.navigation3:navigation3-runtime:1.1.4")
     implementation("androidx.navigation3:navigation3-ui:1.1.4")

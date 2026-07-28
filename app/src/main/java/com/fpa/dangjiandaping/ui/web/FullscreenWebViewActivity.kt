@@ -66,7 +66,8 @@ class FullscreenWebViewActivity : Activity() {
             domStorageEnabled = true
             mediaPlaybackRequiresUserGesture = false
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-            cacheMode = WebSettings.LOAD_NO_CACHE
+            cacheMode = WebSettings.LOAD_DEFAULT
+            userAgentString = DESKTOP_USER_AGENT
             useWideViewPort = true
             loadWithOverviewMode = true
             builtInZoomControls = false
@@ -92,6 +93,9 @@ class FullscreenWebViewActivity : Activity() {
 
     companion object {
         private const val EXTRA_URL = "url"
+        private const val DESKTOP_USER_AGENT =
+            "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 " +
+                "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
         fun newIntent(context: Context, url: String): Intent =
             Intent(context, FullscreenWebViewActivity::class.java)

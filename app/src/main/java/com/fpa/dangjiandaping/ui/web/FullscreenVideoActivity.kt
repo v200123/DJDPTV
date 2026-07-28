@@ -9,43 +9,44 @@ import android.os.Bundle
 import android.view.View
 import android.view.WindowManager
 import android.widget.FrameLayout
-import android.widget.MediaController
-import android.widget.VideoView
+import com.shuyu.gsyvideoplayer.GSYVideoManager
+import com.shuyu.gsyvideoplayer.player.PlayerFactory
+import com.shuyu.gsyvideoplayer.video.StandardGSYVideoPlayer
+import tv.danmaku.ijk.media.exo2.Exo2PlayerManager
 
-/** Fullscreen native video player opened from the WebView JavaScript bridge. */
+/** Fullscreen GSYVideo player opened from the WebView JavaScript bridge. */
 class FullscreenVideoActivity : Activity() {
 
-    private lateinit var videoView: VideoView
+    private lateinit var videoPlayer: StandardGSYVideoPlayer
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enterImmersiveMode()
-
         val videoUrl = intent.getStringExtra(EXTRA_VIDEO_URL).orEmpty()
+        val videoTitle = intent.getStringExtra(EXTRA_VIDEO_TITLE).orEmpty()
         if (videoUrl.isBlank()) {
             finish()
             return
         }
 
-        videoView = VideoView(this).apply {
+        PlayerFactory.setPlayManager(Exo2PlayerManager::class.java)
+        videoPlayer = StandardGSYVideoPlayer(this).apply {
             isFocusable = true
             isFocusableInTouchMode = true
-            setMediaController(MediaController(this@FullscreenVideoActivity).also { controller ->
-                controller.setAnchorView(this)
-            })
-            setVideoURI(Uri.parse(videoUrl))
-            setOnPreparedListener { player ->
-                player.isLooping = false
-                requestFocus()
-                start()
-            }
+            setUp(videoUrl, false, videoTitle)
+            setOverrideExtension(if (isHlsVideoUrl(videoUrl)) "m3u8" else null)
+            isLooping = false
+            fullscreenButton.visibility = View.GONE
+            titleTextView.visibility = if (videoTitle.isBlank()) View.GONE else View.VISIBLE
+            backButton.setOnClickListener { finish() }
             requestFocus()
+            startPlayLogic()
         }
         setContentView(
             FrameLayout(this).apply {
                 setBackgroundColor(Color.BLACK)
                 addView(
-                    videoView,
+                    videoPlayer,
                     FrameLayout.LayoutParams(
                         FrameLayout.LayoutParams.MATCH_PARENT,
                         FrameLayout.LayoutParams.MATCH_PARENT,
@@ -59,12 +60,22 @@ class FullscreenVideoActivity : Activity() {
         super.onWindowFocusChanged(hasFocus)
         if (hasFocus) {
             enterImmersiveMode()
-            videoView.requestFocus()
+            videoPlayer.requestFocus()
         }
     }
 
+    override fun onPause() {
+        if (::videoPlayer.isInitialized) videoPlayer.onVideoPause()
+        super.onPause()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::videoPlayer.isInitialized) videoPlayer.onVideoResume(false)
+    }
+
     override fun onDestroy() {
-        if (::videoView.isInitialized) videoView.stopPlayback()
+        if (::videoPlayer.isInitialized) GSYVideoManager.releaseAllVideos()
         super.onDestroy()
     }
 
@@ -83,11 +94,16 @@ class FullscreenVideoActivity : Activity() {
                 View.SYSTEM_UI_FLAG_LAYOUT_STABLE
     }
 
+    private fun isHlsVideoUrl(videoUrl: String): Boolean =
+        Uri.parse(videoUrl).path?.endsWith(".m3u8", ignoreCase = true) == true
+
     companion object {
         private const val EXTRA_VIDEO_URL = "video_url"
+        private const val EXTRA_VIDEO_TITLE = "video_title"
 
-        fun newIntent(context: Context, videoUrl: String): Intent =
+        fun newIntent(context: Context, videoUrl: String, videoTitle: String): Intent =
             Intent(context, FullscreenVideoActivity::class.java)
                 .putExtra(EXTRA_VIDEO_URL, videoUrl)
+                .putExtra(EXTRA_VIDEO_TITLE, videoTitle)
     }
 }

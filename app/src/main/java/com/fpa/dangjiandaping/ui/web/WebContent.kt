@@ -41,6 +41,8 @@ private class WebFocusBridge(
     private val webView: WebView,
     private val onRequestNativeFocus: () -> Unit,
     private val onShowNewsDetail: (String) -> Unit,
+    private val onShowServiceTeam: (String) -> Unit,
+    private val onShowPublicHelpRequest: (String) -> Unit,
     private val onPlayVideo: (String) -> Unit,
     private val onShowWebViewUrl: (String) -> Unit,
 ) {
@@ -71,6 +73,36 @@ private class WebFocusBridge(
     }
 
     @JavascriptInterface
+    fun showServiceTeam(teamJson: String) {
+        Log.d(WEB_LOG_TAG, "H5 called showServiceTeam")
+        webView.post {
+            webView.clearFocus()
+            onShowServiceTeam(teamJson)
+        }
+    }
+
+    @JavascriptInterface
+    fun openServiceTeam(teamJson: String) = showServiceTeam(teamJson)
+
+    @JavascriptInterface
+    fun showPublicHelpRequest(requestJson: String) {
+        Log.d(WEB_LOG_TAG, "H5 called showPublicHelpRequest")
+        webView.post {
+            webView.clearFocus()
+            onShowPublicHelpRequest(requestJson)
+        }
+    }
+
+    @JavascriptInterface
+    fun openPublicHelpRequest(requestJson: String) = showPublicHelpRequest(requestJson)
+
+    @JavascriptInterface
+    fun showHelpRequest(requestJson: String) = showPublicHelpRequest(requestJson)
+
+    @JavascriptInterface
+    fun openHelpRequest(requestJson: String) = showPublicHelpRequest(requestJson)
+
+    @JavascriptInterface
     fun playVideo(videoUrl: String) {
         Log.d(WEB_LOG_TAG, "H5 called playVideo: $videoUrl")
         webView.post {
@@ -96,6 +128,7 @@ internal fun WebContent(
     onReleased: (WebView) -> Unit,
     onCanGoBackChanged: (Boolean) -> Unit,
     onRequestNativeFocus: () -> Unit,
+    onShowPublicHelpRequest: (PublicHelpRequest) -> Unit,
     modifier: Modifier = Modifier
 ) {
 //    if (LocalInspectionMode.current) {
@@ -109,6 +142,7 @@ internal fun WebContent(
 //    var createWebView by remember { mutableStateOf(false) }
     var loadingUrl by remember { mutableStateOf<String?>(url) }
     var newsDetail by remember(url) { mutableStateOf<NewsDetail?>(null) }
+    var serviceTeam by remember(url) { mutableStateOf<ServiceTeam?>(null) }
 
 //    LaunchedEffect(Unit) {
 //        // WebView 首次初始化较重，至少让顶部原生界面先完成一帧绘制。
@@ -170,10 +204,32 @@ internal fun WebContent(
                                             )
                                         }
                                 },
+                                onShowServiceTeam = { teamJson ->
+                                    runCatching { parseServiceTeam(teamJson) }
+                                        .onSuccess { serviceTeam = it }
+                                        .onFailure { error ->
+                                            Log.e(WEB_LOG_TAG, "Unable to parse service team JSON", error)
+                                        }
+                                },
+                                onShowPublicHelpRequest = { requestJson ->
+                                    runCatching { parsePublicHelpRequest(requestJson) }
+                                        .onSuccess(onShowPublicHelpRequest)
+                                        .onFailure { error ->
+                                            Log.e(
+                                                WEB_LOG_TAG,
+                                                "Unable to parse public help request JSON",
+                                                error,
+                                            )
+                                        }
+                                },
                                 onPlayVideo = { requestedUrl ->
                                     if (requestedUrl.isNotEmpty()) {
                                         context.startActivity(
-                                            FullscreenVideoActivity.newIntent(context, requestedUrl)
+                                            FullscreenVideoActivity.newIntent(
+                                                context = context,
+                                                videoUrl = requestedUrl,
+                                                videoTitle = title.orEmpty(),
+                                            )
                                         )
                                     }
                                 },
@@ -309,6 +365,13 @@ internal fun WebContent(
             )
         }
 
+        serviceTeam?.let { team ->
+            ServiceTeamDialog(
+                team = team,
+                onDismiss = { serviceTeam = null },
+            )
+        }
+
     }
 }
 
@@ -344,6 +407,7 @@ private fun WebContentPreview() {
             onReleased = {},
             onCanGoBackChanged = {},
             onRequestNativeFocus = {},
+            onShowPublicHelpRequest = {},
             modifier = Modifier.fillMaxSize()
         )
     }

@@ -71,9 +71,11 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.compose.ui.zIndex
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.fpa.dangjiandaping.R
+import com.fpa.dangjiandaping.ui.web.FullscreenWebViewActivity
 import com.shuyu.gsyvideoplayer.compose.native_.GSYPlayState
 import com.shuyu.gsyvideoplayer.compose.native_.GSYPlayerSurface
 import com.shuyu.gsyvideoplayer.compose.native_.rememberGSYPlayerController
@@ -84,9 +86,12 @@ import java.net.HttpURLConnection
 import java.net.URL
 
 private const val DEFAULT_HOME_VIDEO_URL = "https://imgcdn.scdjw.com.cn/video/d28b65ed-ec69-490d-b339-9380572419f6.mp4"
+private const val PARTY_PIONEER_MOBILE_URL = "https://12371.people.com.cn/"
+private const val PARTY_MEMBER_LEARNING_URL = "https://www.scycjy.gov.cn/dyxx_mys.html"
+private const val KANGBA_PARTY_FLAG_URL = "https://www.xyxf.gov.cn/#/index/subordinate/kbdqh"
 
 private val Gold = Color(0xFFFFD889)
-private val BrightGold = Color(0xF8EAEA)
+private val BrightGold = Color(0xFFFFD186)
 private val PanelRed = Color(0xB078101B)
 private val PanelStroke = Color(0x90E56E59)
 private val PrimaryRed = Color(0xFFD71920)
@@ -128,9 +133,14 @@ internal fun HomeScreen(
     partyStats: List<PartyStat> = defaultPartyStats,
     contentFocusRequester: FocusRequester? = null,
     onRequestTabFocus: () -> Unit = {},
+    onCoursewareClick: (Int) -> Unit = {},
+    onPartyBuildingClick: (Int) -> Unit = {},
 ) {
+    val context = LocalContext.current
     val lastTopicFocusRequester = remember { FocusRequester() }
     val fullscreenFocusRequester = remember { FocusRequester() }
+    val videoControlFocusRequester = remember { FocusRequester() }
+    val firstPartyBuildingFocusRequester = remember { FocusRequester() }
 
     Box(
         modifier = modifier
@@ -158,6 +168,8 @@ internal fun HomeScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .height(36.dp),
+                firstItemFocusRequester = contentFocusRequester,
+                firstItemDownFocusRequester = videoControlFocusRequester,
             )
 
             Row(
@@ -168,15 +180,19 @@ internal fun HomeScreen(
             ) {
                 HomeVideoPlayer(
                     videoUrl = videoUrl,
-                    playFocusRequester = contentFocusRequester,
+                    playFocusRequester = videoControlFocusRequester,
                     fullscreenFocusRequester = fullscreenFocusRequester,
+                    rightFocusRequester = firstPartyBuildingFocusRequester,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight(),
                 )
                 PartyWorkPanel(
                     partyStats = partyStats,
-                    fullscreenFocusRequester = fullscreenFocusRequester,
+                    videoControlFocusRequester = videoControlFocusRequester,
+                    topFocusRequester = contentFocusRequester,
+                    firstItemFocusRequester = firstPartyBuildingFocusRequester,
+                    onPartyBuildingClick = onPartyBuildingClick,
                     modifier = Modifier
                         .weight(1.08f)
                         .fillMaxHeight(),
@@ -191,13 +207,17 @@ internal fun HomeScreen(
             ) {
                 TopicPanel(
                     lastTopicFocusRequester = lastTopicFocusRequester,
-                    fullscreenFocusRequester = fullscreenFocusRequester,
+                    videoControlFocusRequester = videoControlFocusRequester,
+                    onOpenUrl = { url ->
+                        context.startActivity(FullscreenWebViewActivity.newIntent(context, url))
+                    },
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight(),
                 )
                 CoursewarePanel(
                     leftTopicFocusRequester = lastTopicFocusRequester,
+                    onCoursewareClick = onCoursewareClick,
                     modifier = Modifier
                         .weight(1.08f)
                         .fillMaxHeight(),
@@ -297,7 +317,11 @@ private fun HomeBackdrop(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun NewsTicker(modifier: Modifier = Modifier) {
+private fun NewsTicker(
+    modifier: Modifier = Modifier,
+    firstItemFocusRequester: FocusRequester? = null,
+    firstItemDownFocusRequester: FocusRequester? = null,
+) {
     Box(
         modifier = modifier
             .clip(RoundedCornerShape(6.dp))
@@ -317,7 +341,12 @@ private fun NewsTicker(modifier: Modifier = Modifier) {
         ) {
             SpeakerIcon(Modifier.size(24.dp))
             Spacer(Modifier.width(12.dp))
-            TickerItem("关于组织开展2024年度党员教育培训工作", Modifier.weight(1f))
+            TickerItem(
+                text = "关于组织开展2024年度党员教育培训工作",
+                modifier = Modifier.weight(1f),
+                focusRequester = firstItemFocusRequester,
+                downFocusRequester = firstItemDownFocusRequester,
+            )
             TickerDivider()
             TickerItem("雅江县：“三维赋能”让党员教育在高原落地生根", Modifier.weight(1.2f))
             TickerDivider()
@@ -327,16 +356,40 @@ private fun NewsTicker(modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun TickerItem(text: String, modifier: Modifier = Modifier) {
-    Text(
-        text = text,
-        color = Color(0xFF650D0B),
-        fontSize = 12.sp,
-        fontWeight = FontWeight.Medium,
-        maxLines = 1,
-        overflow = TextOverflow.Ellipsis,
-        modifier = modifier.padding(horizontal = 12.dp),
-    )
+private fun TickerItem(
+    text: String,
+    modifier: Modifier = Modifier,
+    focusRequester: FocusRequester? = null,
+    downFocusRequester: FocusRequester? = null,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(4.dp)
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .then(if (focused) Modifier.border(1.dp, PrimaryRed, shape) else Modifier)
+            .onFocusChanged { focused = it.isFocused }
+            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+            .then(
+                if (downFocusRequester != null) {
+                    Modifier.focusProperties { down = downFocusRequester }
+                } else {
+                    Modifier
+                },
+            )
+            .focusable()
+            .padding(horizontal = 12.dp, vertical = 4.dp),
+        contentAlignment = Alignment.CenterStart,
+    ) {
+        Text(
+            text = text,
+            color = Color(0xFF650D0B),
+            fontSize = 12.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
+    }
 }
 
 @Composable
@@ -372,6 +425,7 @@ private fun HomeVideoPlayer(
     videoUrl: String,
     playFocusRequester: FocusRequester? = null,
     fullscreenFocusRequester: FocusRequester? = null,
+    rightFocusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier,
 ) {
     val inPreview = LocalInspectionMode.current
@@ -390,6 +444,7 @@ private fun HomeVideoPlayer(
                 videoUrl = videoUrl,
                 playFocusRequester = playFocusRequester,
                 fullscreenFocusRequester = fullscreenFocusRequester,
+                rightFocusRequester = rightFocusRequester,
             )
         }
 
@@ -411,13 +466,14 @@ private fun RuntimeVideoPlayer(
     videoUrl: String,
     playFocusRequester: FocusRequester?,
     fullscreenFocusRequester: FocusRequester?,
+    rightFocusRequester: FocusRequester?,
 ) {
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
     val controller = rememberGSYPlayerController(
         url = videoUrl,
         title = "康巴党旗红",
-        autoPlay = false,
+        autoPlay = true,
     )
     // GSY 已在应用入口切换到 Exo2/Media3 内核。对 HLS 地址再显式声明格式，
     // 可避免带 query 参数的 m3u8 链接被错误按普通媒体源解析。
@@ -449,9 +505,9 @@ private fun RuntimeVideoPlayer(
         }
     }
 
-    Box(Modifier.fillMaxSize().background(Color.Black)) {
+    Box(Modifier.fillMaxSize()) {
         key(surfaceGeneration) {
-            GSYPlayerSurface(controller, Modifier.fillMaxSize())
+            GSYPlayerSurface(controller, Modifier.matchParentSize())
         }
 
         if (snapshot.state == GSYPlayState.Idle ||
@@ -495,8 +551,8 @@ private fun RuntimeVideoPlayer(
                 dragging = false
             },
             onFullscreen = { activity?.let { controller.enterFullscreen(it) } },
-            primaryControlFocusRequester =
-                if (snapshot.isPlaying) playFocusRequester else null,
+            primaryControlFocusRequester = playFocusRequester,
+            primaryControlRightFocusRequester = rightFocusRequester,
             fullscreenFocusRequester = fullscreenFocusRequester,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
@@ -550,6 +606,7 @@ private fun VideoControlBar(
     onDragFinished: (Float) -> Unit,
     onFullscreen: () -> Unit,
     primaryControlFocusRequester: FocusRequester? = null,
+    primaryControlRightFocusRequester: FocusRequester? = null,
     fullscreenFocusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier,
 ) {
@@ -578,6 +635,13 @@ private fun VideoControlBar(
                 .then(
                     if (primaryControlFocusRequester != null) {
                         Modifier.focusRequester(primaryControlFocusRequester)
+                    } else {
+                        Modifier
+                    }
+                )
+                .then(
+                    if (primaryControlRightFocusRequester != null) {
+                        Modifier.focusProperties { right = primaryControlRightFocusRequester }
                     } else {
                         Modifier
                     }
@@ -731,39 +795,58 @@ private fun FocusableAction(
 @Composable
 private fun PartyWorkPanel(
     partyStats: List<PartyStat>,
-    fullscreenFocusRequester: FocusRequester,
+    videoControlFocusRequester: FocusRequester,
+    topFocusRequester: FocusRequester?,
+    firstItemFocusRequester: FocusRequester,
+    onPartyBuildingClick: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     HomePanel(modifier.focusGroup()) {
         SectionTitle(R.drawable.ic_home_jiceng)
         Spacer(Modifier.height(3.dp))
         Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                ,
+            modifier = Modifier.fillMaxWidth(),
             verticalArrangement = Arrangement.SpaceEvenly,
         ) {
             Row(Modifier.fillMaxWidth()) {
-                partyStats.take(4).forEach { stat ->
+                partyStats.take(4).forEachIndexed { index, stat ->
                     PartyStatItem(
                         stat,
                         Modifier
                             .weight(1f)
                             .then(
-                                if (stat.title == "农村党建" || stat.title == "企业党建") {
-                                    Modifier.focusProperties { left = fullscreenFocusRequester }
+                                if (index == 0) {
+                                    Modifier.focusRequester(firstItemFocusRequester)
                                 } else {
                                     Modifier
+                                },
+                            )
+                            .focusProperties {
+                                if (index == 0) {
+                                    left = videoControlFocusRequester
                                 }
-                            ),
+                                if (topFocusRequester != null) {
+                                    up = topFocusRequester
+                                }
+                            },
+                        onClick = { onPartyBuildingClick(stat.channelId) },
                     )
                 }
             }
             Row(Modifier.fillMaxWidth()) {
-                partyStats.drop(4).forEach { stat ->
+                partyStats.drop(4).forEachIndexed { index, stat ->
                     PartyStatItem(
                         stat = stat,
-                        modifier = Modifier.weight(1f),
+                        modifier = Modifier
+                            .weight(1f)
+                            .then(
+                                if (index == 0) {
+                                    Modifier.focusProperties { left = videoControlFocusRequester }
+                                } else {
+                                    Modifier
+                                },
+                            ),
+                        onClick = { onPartyBuildingClick(stat.channelId) },
                     )
                 }
                 Spacer(Modifier.weight(1f))
@@ -771,18 +854,7 @@ private fun PartyWorkPanel(
         }
 
         Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f)) {  SectionTitle(R.drawable.ic_home_ganburenmian) }
-            PartyPanelFocusableItem(
-                modifier = Modifier.focusProperties { left = fullscreenFocusRequester },
-            ) {
-//                Text(
-//                    "更多 >>",
-//                    color = Color.White,
-//                    fontSize = 11.sp,
-//                    fontWeight = FontWeight.Bold,
-//                    modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp),
-//                )
-            }
+            Box(Modifier.weight(1f)) { SectionTitle(R.drawable.ic_home_ganburenmian) }
         }
         Spacer(Modifier.height(2.dp))
         Column(
@@ -793,7 +865,7 @@ private fun PartyWorkPanel(
                 PartyPanelFocusableItem(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .focusProperties { left = fullscreenFocusRequester },
+                        .focusProperties { left = videoControlFocusRequester },
                 ) {
                     Row(
                         modifier = Modifier
@@ -889,7 +961,8 @@ private fun PartyPanelFocusableItem(
 @Composable
 private fun TopicPanel(
     lastTopicFocusRequester: FocusRequester,
-    fullscreenFocusRequester: FocusRequester,
+    videoControlFocusRequester: FocusRequester,
+    onOpenUrl: (String) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     HomePanel(modifier) {
@@ -902,31 +975,36 @@ private fun TopicPanel(
             FeatureCard(
                 modifier = Modifier
                     .weight(1f)
-                    .focusProperties { up = fullscreenFocusRequester },
-                R.drawable.ic_home_zhuanlan_01
+                    .focusProperties { up = videoControlFocusRequester },
+                image = R.drawable.ic_home_zhuanlan_01,
+                onClick = { onOpenUrl(PARTY_PIONEER_MOBILE_URL) },
             )
             FeatureCard(
                 modifier = Modifier
                     .weight(1f)
-                    .focusProperties { up = fullscreenFocusRequester },
-                R.drawable.ic_home_zhuanlan_02
-
+                    .focusProperties { up = videoControlFocusRequester },
+                image = R.drawable.ic_home_zhuanlan_02,
+                onClick = { onOpenUrl(PARTY_MEMBER_LEARNING_URL) },
             )
             FeatureCard(
                 modifier = Modifier
                     .weight(1f)
                     .focusRequester(lastTopicFocusRequester)
-                    .focusProperties { up = fullscreenFocusRequester },
-                R.drawable.ic_home_zhuanlan_03
-
+                    .focusProperties { up = videoControlFocusRequester },
+                image = R.drawable.ic_home_zhuanlan_03,
+                onClick = { onOpenUrl(KANGBA_PARTY_FLAG_URL) },
             )
         }
     }
 }
 
 @Composable
-private fun FeatureCard(modifier: Modifier, @DrawableRes image: Int) {
-    FocusableTile(modifier) {
+private fun FeatureCard(
+    modifier: Modifier,
+    @DrawableRes image: Int,
+    onClick: () -> Unit,
+) {
+    FocusableTile(modifier, onClick) {
         Image(
             painter = painterResource(image),
             contentScale = ContentScale.FillBounds,
@@ -939,6 +1017,7 @@ private fun FeatureCard(modifier: Modifier, @DrawableRes image: Int) {
 @Composable
 private fun CoursewarePanel(
     leftTopicFocusRequester: FocusRequester,
+    onCoursewareClick: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     HomePanel(modifier) {
@@ -949,14 +1028,27 @@ private fun CoursewarePanel(
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
             CourseCard(
-                "中组部",
-                "最新课件28个",
+                "",
+                "",
                 Color(0xFFA31712),
                 R.drawable.ic_home_kejian_01,
                 Modifier.focusProperties { left = leftTopicFocusRequester },
+                onClick = { onCoursewareClick(1) },
             )
-            CourseCard("省委组织部", "最新课件28个", Color(0xFF294581), R.drawable.ic_home_kejian_02,  Modifier)
-            CourseCard("州委组织部", "最新课件28个", Color(0xFF185E2F), R.drawable.ic_home_kejian_03,  Modifier)
+            CourseCard("",
+                "",
+                Color(0xFF294581),
+                R.drawable.ic_home_kejian_02,
+                Modifier,
+                onClick = { onCoursewareClick(2) },
+            )
+            CourseCard("",
+                "",
+                Color(0xFF185E2F),
+                R.drawable.ic_home_kejian_03,
+                Modifier,
+                onClick = { onCoursewareClick(3) },
+            )
         }
     }
 }
@@ -990,8 +1082,9 @@ private fun CourseCard(
     titleTextColor: Color,
     @DrawableRes icon: Int,
     modifier: Modifier = Modifier,
+    onClick: () -> Unit = {},
 ) {
-    FocusableTile(modifier) {
+    FocusableTile(modifier, onClick) {
         Box(
             Modifier
                 .size(135.dp, 65.dp)
@@ -1008,19 +1101,21 @@ private fun CourseCard(
 @Composable
 private fun FocusableTile(
     modifier: Modifier = Modifier,
+    onClick: () -> Unit = {},
     content: @Composable () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.04f else 1f, label = "homeTileScale")
+    val scale by animateFloatAsState(if (focused) 1.10f else 1f, label = "homeTileScale")
 
     Box(
         modifier = modifier
             .fillMaxHeight()
+            .zIndex(if (focused) 1f else 0f)
             .graphicsLayer { scaleX = scale; scaleY = scale }
             .clip(RoundedCornerShape(8.dp))
             .then(if (focused) Modifier.border(3.dp, BrightGold, RoundedCornerShape(8.dp)) else Modifier)
             .onFocusChanged { focused = it.isFocused }
-            .clickable { }
+            .clickable(onClick = onClick)
             .focusable(),
     ) {
         content()

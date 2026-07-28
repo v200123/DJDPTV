@@ -53,8 +53,11 @@ import com.fpa.dangjiandaping.ui.navigation.HomeRoute
 import com.fpa.dangjiandaping.ui.navigation.TV_TABS
 import com.fpa.dangjiandaping.ui.navigation.TvRoute
 import com.fpa.dangjiandaping.ui.navigation.WebRoute
+import com.fpa.dangjiandaping.ui.navigation.coursewareRoute
 import com.fpa.dangjiandaping.ui.navigation.partyBuildingRoute
 import com.fpa.dangjiandaping.ui.navigation.toRoute
+import com.fpa.dangjiandaping.ui.web.PublicHelpRequest
+import com.fpa.dangjiandaping.ui.web.PublicHelpRequestDialog
 import com.fpa.dangjiandaping.ui.web.WebContent
 
 private const val HOME_TAB_INDEX = 0
@@ -75,6 +78,7 @@ fun DangJianTvScreen() {
     var pendingContentFocusRoute by remember { mutableStateOf<TvRoute?>(null) }
     var pendingTabFocusIndex by remember { mutableStateOf<Int?>(null) }
     var partyStats by remember { mutableStateOf(defaultPartyStats) }
+    var publicHelpRequest by remember { mutableStateOf<PublicHelpRequest?>(null) }
 
     val tabFocusRequesters = rememberTvTabFocusRequesters()
     val contentFocusRequester = remember { FocusRequester() }
@@ -118,6 +122,15 @@ fun DangJianTvScreen() {
             moveFocusToContent = false,
         )
         pendingTabFocusIndex = 6
+    }
+
+    fun openCourseware(type: Int) {
+        activateRoute(
+            tabIndex = 5,
+            targetRoute = coursewareRoute(type),
+            moveFocusToContent = false,
+        )
+        pendingTabFocusIndex = 5
     }
 
     fun handleBack() {
@@ -243,12 +256,19 @@ fun DangJianTvScreen() {
                         partyStats = partyStats,
                         contentFocusRequester = contentFocusRequester,
                         onRequestTabFocus = ::requestSelectedTabFocus,
+                        onCoursewareClick = ::openCourseware,
+                        onPartyBuildingClick = ::openPartyBuilding,
                     )
                 }
 
                 TV_TABS.forEachIndexed { tabIndex, tab ->
-                    val route = tab.destination.toRoute(tabIndex) as? WebRoute ?: return@forEachIndexed
-                    val webIsActive = currentRoute == route
+                    val defaultRoute =
+                        tab.destination.toRoute(tabIndex) as? WebRoute ?: return@forEachIndexed
+                    val route = (currentRoute as? WebRoute)
+                        ?.takeIf { it.tabIndex == tabIndex }
+                        ?: defaultRoute
+                    val webIsActive =
+                        currentRoute is WebRoute && currentRoute.tabIndex == tabIndex
                     WebContent(
                         url = route.url,
                         active = webIsActive,
@@ -262,6 +282,9 @@ fun DangJianTvScreen() {
                             if (currentRoute == route) canWebViewGoBack = canGoBack
                         },
                         onRequestNativeFocus = ::requestSelectedTabFocus,
+                        onShowPublicHelpRequest = { request ->
+                            publicHelpRequest = request
+                        },
                         modifier = Modifier
                             .fillMaxSize()
                             .padding(50.dp, 0.dp)
@@ -269,6 +292,15 @@ fun DangJianTvScreen() {
                     )
                 }
             }
+        }
+
+        publicHelpRequest?.let { request ->
+            PublicHelpRequestDialog(
+                request = request,
+                onDismiss = { publicHelpRequest = null },
+                onHandled = { publicHelpRequest = null },
+                onContactLater = { publicHelpRequest = null },
+            )
         }
     }
 }

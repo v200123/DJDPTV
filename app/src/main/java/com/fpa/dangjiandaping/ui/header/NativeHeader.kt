@@ -288,7 +288,19 @@ private fun StableTabLabel(text: String, emphasized: Boolean, focused: Boolean) 
                     val scale = if (emphasized) 22f / 16f else 1f
                     scaleX = scale
                     scaleY = scale
-                },
+                }
+                    .then(
+                        if (focused) {
+                            Modifier.border(
+                                width = 2.dp,
+                                color = Color(0xFFFFD186),
+                                shape = RoundedCornerShape(5.dp),
+                            )
+                        } else {
+                            Modifier
+                        },
+                    )
+                    .padding(horizontal = 5.dp, vertical = 2.dp),
             )
         },
     ) { measurables, constraints ->
