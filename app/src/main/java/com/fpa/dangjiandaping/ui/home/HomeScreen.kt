@@ -159,7 +159,7 @@ internal fun HomeScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 51.dp, vertical = 10.dp),
+                .padding(51.dp,8.dp,51.dp,10.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             NewsTicker(
@@ -173,7 +173,7 @@ internal fun HomeScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(218.dp),
+                    .height(225.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 HomeVideoPlayer(
@@ -813,19 +813,27 @@ private fun PartyWorkPanel(
     onPartyBuildingClick: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val sectionHorizontalPadding = 4.dp
+    val partyStatItemWidth = 96.dp
+
     HomePanel(modifier.focusGroup()) {
         SectionTitle(R.drawable.ic_home_jiceng)
         Spacer(Modifier.height(3.dp))
         Column(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = sectionHorizontalPadding),
             verticalArrangement = Arrangement.SpaceEvenly,
         ) {
-            Row(Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
                 partyStats.take(4).forEachIndexed { index, stat ->
                     PartyStatItem(
                         stat = stat,
                         modifier = Modifier
-                            .weight(1f)
+                            .width(partyStatItemWidth)
                             .then(
                                 if (index == 0) {
                                     Modifier.focusRequester(firstItemFocusRequester)
@@ -846,12 +854,15 @@ private fun PartyWorkPanel(
                 }
             }
             val secondRowStats = partyStats.drop(4).take(4)
-            Row(Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
                 secondRowStats.forEachIndexed { index, stat ->
                     PartyStatItem(
                         stat = stat,
                         modifier = Modifier
-                            .weight(1f)
+                            .width(partyStatItemWidth)
                             .then(
                                 if (index == 0) {
                                     Modifier.focusProperties {
@@ -865,7 +876,7 @@ private fun PartyWorkPanel(
                     )
                 }
                 repeat(4 - secondRowStats.size) {
-                    Spacer(Modifier.weight(1f))
+                    Spacer(Modifier.width(partyStatItemWidth))
                 }
             }
         }
@@ -875,8 +886,14 @@ private fun PartyWorkPanel(
         }
         Spacer(Modifier.height(2.dp))
         Column(
-            modifier = Modifier.weight(0.86f),
-            verticalArrangement = Arrangement.SpaceEvenly,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(0.86f)
+                .padding(horizontal = sectionHorizontalPadding),
+            verticalArrangement = Arrangement.spacedBy(
+                space = 4.dp,
+                alignment = Alignment.CenterVertically,
+            ),
         ) {
             cadreTasks.forEach { task ->
                 PartyPanelFocusableItem(
@@ -931,7 +948,7 @@ private fun PartyStatItem(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 4.dp, vertical = 1.dp),
+                .padding(vertical = 1.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
             Image(

@@ -222,7 +222,7 @@ fun DangJianTvScreen() {
         )
 
         Column(Modifier.fillMaxSize()) {
-            Spacer(modifier = Modifier.height(22.dp))
+            Spacer(modifier = Modifier.height(14.dp))
             NativeHeader(
                 selectedTab = selectedTab,
                 focusedTab = lastFocusedTab,
@@ -291,7 +291,7 @@ fun DangJianTvScreen() {
                             },
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(50.dp,0.dp,50.dp, 10.dp)
+                                .padding(50.dp,8.dp,50.dp, 10.dp)
                                 .zIndex(if (webIsActive) 1f else 0f),
                         )
                     }

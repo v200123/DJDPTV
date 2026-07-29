@@ -2,6 +2,7 @@ package com.fpa.dangjiandaping.ui.web
 
 import android.media.AudioAttributes
 import android.media.MediaPlayer
+import android.net.Uri
 import android.os.Build
 import android.text.Html
 import android.text.method.ScrollingMovementMethod
@@ -53,10 +54,29 @@ import kotlinx.coroutines.delay
 import org.json.JSONArray
 import org.json.JSONObject
 
-internal data class NewsAudio(
-    val label: String,
-    val url: String
-)
+private const val NEWS_FILE_DOWNLOAD_BASE_URL =
+    "https://www.xyxf.gov.cn/prod-api/download"
+
+internal data class NewsVideo(
+    val fileId: String,
+    val type: String,
+    val typeName: String,
+    val filename: String,
+) {
+    val playbackUrl: String
+        get() = "$NEWS_FILE_DOWNLOAD_BASE_URL/${Uri.encode(fileId)}"
+
+    val displayName: String
+        get() = typeName.ifBlank {
+            filename.ifBlank { "音频播报" }
+        }
+
+    val isAudio: Boolean
+        get() = type.equals("audio", ignoreCase = true) ||
+            filename.endsWith(".mp3", ignoreCase = true) ||
+            filename.endsWith(".wav", ignoreCase = true) ||
+            filename.endsWith(".m4a", ignoreCase = true)
+}
 
 internal data class NewsDetail(
     val id: String,
@@ -65,7 +85,7 @@ internal data class NewsDetail(
     val source: String,
     val author: String,
     val publishTime: String,
-    val audios: List<NewsAudio>
+    val videos: List<NewsVideo>,
 )
 
 internal fun parseNewsDetail(json: String): NewsDetail {
@@ -79,7 +99,7 @@ internal fun parseNewsDetail(json: String): NewsDetail {
         publishTime = record.optString("pubTime").ifBlank {
             record.optString("publishTime")
         },
-        audios = extractNewsAudios(record)
+        videos = extractNewsVideos(record),
     )
 }
 
@@ -91,103 +111,31 @@ private fun unwrapNewsRecord(root: JSONObject): JSONObject {
     return data
 }
 
-private fun extractNewsAudios(record: JSONObject): List<NewsAudio> {
-    val result = linkedMapOf<String, NewsAudio>()
+private fun extractNewsVideos(record: JSONObject): List<NewsVideo> {
+    val videosValue = record.opt("videos")
+    val videos = when (videosValue) {
+        is JSONArray -> videosValue
+        is JSONObject -> JSONArray().put(videosValue)
+        is String -> runCatching { JSONArray(videosValue) }.getOrNull()
+        else -> null
+    } ?: return emptyList()
 
-    fun addAudio(label: String, url: String) {
-        val normalizedUrl = url.trim()
-        if (normalizedUrl.startsWith("http://") ||
-            normalizedUrl.startsWith("https://") ||
-            normalizedUrl.startsWith("content://") ||
-            normalizedUrl.startsWith("file://")
-        ) {
-            result.putIfAbsent(
-                normalizedUrl,
-                NewsAudio(label = label.ifBlank { "音频播报" }, url = normalizedUrl)
-            )
-        }
+    val result = linkedMapOf<String, NewsVideo>()
+    for (index in 0 until videos.length()) {
+        val item = videos.optJSONObject(index) ?: continue
+        val fileId = item.optString("fileId").trim()
+        if (fileId.isEmpty()) continue
+
+        result.putIfAbsent(
+            fileId,
+            NewsVideo(
+                fileId = fileId,
+                filename = item.optString("filename").trim(),
+                type = item.optString("type").trim(),
+                typeName = item.optString("typeName").trim(),
+            ),
+        )
     }
-
-    fun defaultLabel(key: String, index: Int): String {
-        val normalizedKey = key.lowercase()
-        return when {
-            normalizedKey.contains("tibet") ||
-                normalizedKey.contains("zang") ||
-                key.contains("藏") -> "藏语播报"
-
-            normalizedKey.contains("mandarin") ||
-                normalizedKey.contains("chinese") ||
-                normalizedKey.contains("han") ||
-                key.contains("汉") -> "汉语播报"
-
-            index > 0 -> "音频播报${index + 1}"
-            else -> "音频播报"
-        }
-    }
-
-    fun isAudioKey(key: String): Boolean {
-        val normalizedKey = key.lowercase()
-        return normalizedKey.contains("audio") ||
-            normalizedKey.contains("voice") ||
-            normalizedKey.contains("sound") ||
-            normalizedKey.contains("mandarin") ||
-            normalizedKey.contains("tibetan") ||
-            normalizedKey.contains("zang") ||
-            key.contains("音频") ||
-            key.contains("语音") ||
-            key.contains("播报")
-    }
-
-    fun visit(value: Any?, key: String, depth: Int, audioContext: Boolean, index: Int = 0) {
-        if (depth > 5 || value == null || value === JSONObject.NULL) return
-        val nextAudioContext = audioContext || isAudioKey(key)
-        when (value) {
-            is String -> {
-                if (nextAudioContext) addAudio(defaultLabel(key, index), value)
-            }
-
-            is JSONObject -> {
-                val objectLabel = value.optString("label")
-                    .ifBlank { value.optString("name") }
-                    .ifBlank { value.optString("language") }
-                val directUrl = listOf("url", "src", "fileUrl", "audioUrl", "voiceUrl")
-                    .firstNotNullOfOrNull { field ->
-                        value.optString(field).takeIf { it.isNotBlank() }
-                    }
-                if (nextAudioContext && directUrl != null) {
-                    addAudio(
-                        objectLabel.ifBlank { defaultLabel(key, index) },
-                        directUrl
-                    )
-                }
-                val keys = value.keys()
-                while (keys.hasNext()) {
-                    val childKey = keys.next()
-                    visit(
-                        value = value.opt(childKey),
-                        key = childKey,
-                        depth = depth + 1,
-                        audioContext = nextAudioContext,
-                        index = index
-                    )
-                }
-            }
-
-            is JSONArray -> {
-                for (arrayIndex in 0 until value.length()) {
-                    visit(
-                        value = value.opt(arrayIndex),
-                        key = key,
-                        depth = depth + 1,
-                        audioContext = nextAudioContext,
-                        index = arrayIndex
-                    )
-                }
-            }
-        }
-    }
-
-    visit(record, key = "", depth = 0, audioContext = false)
     return result.values.toList()
 }
 
@@ -218,7 +166,10 @@ private fun NewsDetailDialogContent(
     onDismiss: () -> Unit,
     requestInitialFocus: Boolean
 ) {
-    var activeAudioUrl by remember(news.id, news.title) { mutableStateOf<String?>(null) }
+    var activeAudioFileId by remember(news.id, news.title) { mutableStateOf<String?>(null) }
+    val audioVideos = remember(news.videos) {
+        news.videos.filter(NewsVideo::isAudio)
+    }
     val closeFocusRequester = remember { FocusRequester() }
 
     Box(
@@ -266,7 +217,7 @@ private fun NewsDetailDialogContent(
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            if (news.audios.isEmpty()) {
+            if (audioVideos.isEmpty()) {
                 Text(
                     text = "当前新闻数据未提供音频地址",
                     color = Color(0xFF777777),
@@ -279,16 +230,18 @@ private fun NewsDetailDialogContent(
                     horizontalArrangement = Arrangement.spacedBy(28.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    news.audios.take(2).forEach { audio ->
+                    audioVideos.take(2).forEach { audio ->
                         NewsAudioPlayer(
                             audio = audio,
-                            active = activeAudioUrl == audio.url,
+                            active = activeAudioFileId == audio.fileId,
                             onToggle = {
-                                activeAudioUrl =
-                                    if (activeAudioUrl == audio.url) null else audio.url
+                                activeAudioFileId =
+                                    if (activeAudioFileId == audio.fileId) null else audio.fileId
                             },
                             onPlaybackFinished = {
-                                if (activeAudioUrl == audio.url) activeAudioUrl = null
+                                if (activeAudioFileId == audio.fileId) {
+                                    activeAudioFileId = null
+                                }
                             },
                             modifier = Modifier.weight(1f)
                         )
@@ -342,7 +295,7 @@ private fun NewsMetadata(news: NewsDetail) {
 
 @Composable
 private fun NewsAudioPlayer(
-    audio: NewsAudio,
+    audio: NewsVideo,
     active: Boolean,
     onToggle: () -> Unit,
     onPlaybackFinished: () -> Unit,
@@ -355,7 +308,7 @@ private fun NewsAudioPlayer(
             horizontalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             Text(
-                text = audio.label,
+                text = audio.displayName,
                 color = Color(0xFF202020),
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Medium,
@@ -370,13 +323,13 @@ private fun NewsAudioPlayer(
         return
     }
 
-    val mediaPlayer = remember(audio.url) { MediaPlayer() }
-    var prepared by remember(audio.url) { mutableStateOf(false) }
-    var failed by remember(audio.url) { mutableStateOf(false) }
-    var durationMs by remember(audio.url) { mutableIntStateOf(0) }
-    var positionMs by remember(audio.url) { mutableIntStateOf(0) }
+    val mediaPlayer = remember(audio.fileId) { MediaPlayer() }
+    var prepared by remember(audio.fileId) { mutableStateOf(false) }
+    var failed by remember(audio.fileId) { mutableStateOf(false) }
+    var durationMs by remember(audio.fileId) { mutableIntStateOf(0) }
+    var positionMs by remember(audio.fileId) { mutableIntStateOf(0) }
 
-    DisposableEffect(mediaPlayer, audio.url) {
+    DisposableEffect(mediaPlayer, audio.fileId) {
         mediaPlayer.setAudioAttributes(
             AudioAttributes.Builder()
                 .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
@@ -397,7 +350,7 @@ private fun NewsAudioPlayer(
             true
         }
         runCatching {
-            mediaPlayer.setDataSource(audio.url)
+            mediaPlayer.setDataSource(audio.playbackUrl)
             mediaPlayer.prepareAsync()
         }.onFailure {
             failed = true
@@ -434,7 +387,7 @@ private fun NewsAudioPlayer(
         horizontalArrangement = Arrangement.spacedBy(12.dp)
     ) {
         Text(
-            text = audio.label,
+            text = audio.displayName,
             color = Color(0xFF202020),
             fontSize = 17.sp,
             fontWeight = FontWeight.Medium,
@@ -603,15 +556,19 @@ private fun NewsDetailDialogPreview() {
                 source = "州委组织部党员教育中心",
                 author = "柏洁豪",
                 publishTime = "2026-07-10",
-                audios = listOf(
-                    NewsAudio(
-                        label = "汉语播报",
-                        url = "https://example.com/mandarin.mp3"
+                videos = listOf(
+                    NewsVideo(
+                        fileId = "mandarin-preview-file-id",
+                        filename = "汉语播报.mp3",
+                        type = "audio",
+                        typeName = "汉语音频",
                     ),
-                    NewsAudio(
-                        label = "藏语播报",
-                        url = "https://example.com/tibetan.mp3"
-                    )
+                    NewsVideo(
+                        fileId = "tibetan-preview-file-id",
+                        filename = "藏语播报.mp3",
+                        type = "audio",
+                        typeName = "藏语音频",
+                    ),
                 ),
                 content = """
                     <p style="text-align:center"><b>学习贯彻《中国共产党纪律处分条例》</b></p>

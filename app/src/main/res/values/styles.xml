@@ -8,4 +8,9 @@
         <item name="android:windowLightStatusBar">false</item>
         <item name="android:colorAccent">#FFD36A</item>
     </style>
+
+    <style name="Theme.DangJianDaPing.Starting" parent="Theme.DangJianDaPing">
+        <item name="android:windowBackground">@drawable/splash_window_background</item>
+        <item name="android:windowDisablePreview">false</item>
+    </style>
 </resources>
