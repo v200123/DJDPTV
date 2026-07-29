@@ -108,12 +108,12 @@ private const val PARTY_STATISTICS_URL =
 internal val defaultPartyStats = listOf(
     PartyStat(R.drawable.ic_home_dangjian_nongcun, "农村党建", 126, 10899),
     PartyStat(R.drawable.ic_home_chengshishequ, "城市社区", 54, 10897),
-    PartyStat(R.drawable.ic_home_jiguandangjian, "机关党建", 105, 10905),
+    PartyStat(R.drawable.ic_home_jiguandangjian, "\u3000机关党建\u3000", 105, 10905),
     PartyStat(R.drawable.ic_home_shiyedanwei, "事业单位", 126, 10909),
     PartyStat(R.drawable.ic_home_qiyedangjian, "企业党建", 26, 10903),
     PartyStat(R.drawable.ic_home_xinxinglingyu, "新兴领域", 154, 10901),
-    PartyStat(R.drawable.ic_home_dangyuanjiaoyu, "党员教育", 105, 8565),
-    PartyStat(R.drawable.ic_home_dangjian_qita, "其他模块", 105, 10913),
+    PartyStat(R.drawable.ic_home_dangyuanjiaoyu, "党员教育动态", 105, 8565),
+    PartyStat(R.drawable.ic_home_dangjian_qita, "其\u3000\u3000他", 105, 10913),
 )
 
 private data class CadreTask(val name: String, val duty: String, val date: String)

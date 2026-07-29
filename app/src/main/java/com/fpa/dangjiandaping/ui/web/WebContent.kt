@@ -68,14 +68,14 @@ private class WebFocusBridge(
         }
     }
 
-    @JavascriptInterface
-    fun openNewsDetail(newsJson: String) {
-        showNewsDetail(newsJson)
-    }
+//    @JavascriptInterface
+//    fun openNewsDetail(newsJson: String) {
+//        showNewsDetail(newsJson)
+//    }
 
     @JavascriptInterface
     fun showServiceTeam(teamJson: String) {
-        Log.d(WEB_LOG_TAG, "H5 called showServiceTeam")
+        Log.d(WEB_LOG_TAG, "H5 called showServiceTeam${teamJson}")
         webView.post {
             webView.clearFocus()
             onShowServiceTeam(teamJson)
