@@ -822,7 +822,7 @@ private fun PartyWorkPanel(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(horizontal = sectionHorizontalPadding),
-            verticalArrangement = Arrangement.SpaceEvenly,
+            verticalArrangement = Arrangement.spacedBy(6.dp),
         ) {
             PartyStatRow(
                 stats = partyStats.take(4),
@@ -838,6 +838,7 @@ private fun PartyWorkPanel(
             )
         }
 
+        Spacer(Modifier.height(5.dp))
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(Modifier.weight(1f)) { SectionTitle(R.drawable.ic_home_ganburenmian) }
         }
@@ -848,11 +849,11 @@ private fun PartyWorkPanel(
                 .weight(0.86f)
                 .padding(horizontal = sectionHorizontalPadding),
             verticalArrangement = Arrangement.spacedBy(
-                space = 4.dp,
+                space = 5.dp,
                 alignment = Alignment.CenterVertically,
             ),
         ) {
-            cadreTasks.forEach { task ->
+            cadreTasks.take(2).forEach { task ->
                 PartyPanelFocusableItem(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -953,7 +954,7 @@ private fun PartyStatItem(
                     modifier = Modifier.size(width = 32.dp, height = 28.dp),
                 )
                 Text(
-                    text = stat.title,
+                    text = partyStatDisplayTitle(stat.title),
                     color = Color(0xFFF8EAEA),
                     fontSize = 11.sp,
                     lineHeight = 13.sp,
@@ -965,6 +966,14 @@ private fun PartyStatItem(
             }
         }
     }
+}
+
+private fun partyStatDisplayTitle(title: String): String = when (title) {
+    "农村党建" -> "农　村"
+    "机关党建" -> "机关党员"
+    "企业党建" -> "企　业"
+    "其他" -> "其　他"
+    else -> title
 }
 
 @Composable
