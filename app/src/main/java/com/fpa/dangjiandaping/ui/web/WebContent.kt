@@ -43,7 +43,7 @@ private class WebFocusBridge(
     private val onShowNewsDetail: (String) -> Unit,
     private val onShowServiceTeam: (String) -> Unit,
     private val onShowPublicHelpRequest: (String) -> Unit,
-    private val onPlayVideo: (String) -> Unit,
+    private val onPlayVideo: (String,String) -> Unit,
     private val onShowWebViewUrl: (String) -> Unit,
 ) {
     @JavascriptInterface
@@ -103,10 +103,10 @@ private class WebFocusBridge(
     fun openHelpRequest(requestJson: String) = showPublicHelpRequest(requestJson)
 
     @JavascriptInterface
-    fun playVideo(videoUrl: String) {
+    fun playVideo(videoUrl: String?,title:String?) {
         Log.d(WEB_LOG_TAG, "H5 called playVideo: $videoUrl")
         webView.post {
-            onPlayVideo(videoUrl.trim())
+            onPlayVideo(videoUrl?.trim()?:"",title?:"")
         }
     }
 
@@ -222,7 +222,7 @@ internal fun WebContent(
                                             )
                                         }
                                 },
-                                onPlayVideo = { requestedUrl ->
+                                onPlayVideo = { requestedUrl,title ->
                                     if (requestedUrl.isNotEmpty()) {
                                         context.startActivity(
                                             FullscreenVideoActivity.newIntent(

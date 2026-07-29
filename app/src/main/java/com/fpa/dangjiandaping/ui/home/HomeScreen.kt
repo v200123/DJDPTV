@@ -62,12 +62,9 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -913,23 +910,14 @@ private fun PartyStatItem(
         ) {
             Image(painterResource(stat.icon), contentDescription = "", contentScale = ContentScale.Fit, modifier = Modifier.size(42.dp,40.dp))
             Spacer(Modifier.width(7.dp))
-            Column {
-                Text(
-                    stat.title,
-                    color = Color(0xFFF8EAEA),
-                    fontSize = 11.sp,
-                    maxLines = 1,
-                )
-                Row(verticalAlignment = Alignment.Bottom) {
-                    Text(buildAnnotatedString {
-                            append("${stat.count}")
-                            withStyle(SpanStyle(fontSize = 10.sp)){
-                                append("篇")
-                            }
-                        }
-                        , color = Color(0xFFF6CD8B), fontSize = 14.sp)
-                }
-            }
+            Text(
+                text = stat.title,
+                color = Color(0xFFF8EAEA),
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                lineHeight = 15.sp,
+                maxLines = 2,
+            )
         }
     }
 }

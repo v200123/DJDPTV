@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -108,9 +109,12 @@ fun DangJianTvScreen() {
     }
 
     fun activateTab(tabIndex: Int, moveFocusToContent: Boolean) {
+        val targetRoute = (currentRoute as? WebRoute)
+            ?.takeIf { it.tabIndex == tabIndex }
+            ?: TV_TABS[tabIndex].destination.toRoute(tabIndex)
         activateRoute(
             tabIndex = tabIndex,
-            targetRoute = TV_TABS[tabIndex].destination.toRoute(tabIndex),
+            targetRoute = targetRoute,
             moveFocusToContent = moveFocusToContent,
         )
     }
@@ -269,27 +273,29 @@ fun DangJianTvScreen() {
                         ?: defaultRoute
                     val webIsActive =
                         currentRoute is WebRoute && currentRoute.tabIndex == tabIndex
-                    WebContent(
-                        url = route.url,
-                        active = webIsActive,
-                        onCreated = { createdView ->
-                            if (currentRoute == route) webView = createdView
-                        },
-                        onReleased = { releasedView ->
-                            if (webView === releasedView) webView = null
-                        },
-                        onCanGoBackChanged = { canGoBack ->
-                            if (currentRoute == route) canWebViewGoBack = canGoBack
-                        },
-                        onRequestNativeFocus = ::requestSelectedTabFocus,
-                        onShowPublicHelpRequest = { request ->
-                            publicHelpRequest = request
-                        },
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .padding(50.dp, 0.dp)
-                            .zIndex(if (webIsActive) 1f else 0f),
-                    )
+                    key(route.url) {
+                        WebContent(
+                            url = route.url,
+                            active = webIsActive,
+                            onCreated = { createdView ->
+                                if (currentRoute == route) webView = createdView
+                            },
+                            onReleased = { releasedView ->
+                                if (webView === releasedView) webView = null
+                            },
+                            onCanGoBackChanged = { canGoBack ->
+                                if (currentRoute == route) canWebViewGoBack = canGoBack
+                            },
+                            onRequestNativeFocus = ::requestSelectedTabFocus,
+                            onShowPublicHelpRequest = { request ->
+                                publicHelpRequest = request
+                            },
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(50.dp, 0.dp)
+                                .zIndex(if (webIsActive) 1f else 0f),
+                        )
+                    }
                 }
             }
         }
