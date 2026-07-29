@@ -112,8 +112,8 @@ internal val defaultPartyStats = listOf(
     PartyStat(R.drawable.ic_home_shiyedanwei, "事业单位", 126, 10909),
     PartyStat(R.drawable.ic_home_qiyedangjian, "企业党建", 26, 10903),
     PartyStat(R.drawable.ic_home_xinxinglingyu, "新兴领域", 154, 10901),
-    PartyStat(R.drawable.ic_home_dangyuanjiaoyu, "党员教育动态", 105, 8565),
-    PartyStat(R.drawable.ic_home_dangjian_qita, "其他", 105, 10913),
+    PartyStat(R.drawable.ic_home_dangyuanjiaoyu, "党员教育", 105, 8565),
+    PartyStat(R.drawable.ic_home_dangjian_qita, "其他模块", 105, 10913),
 )
 
 private data class CadreTask(val name: String, val duty: String, val date: String)
@@ -814,7 +814,6 @@ private fun PartyWorkPanel(
     modifier: Modifier = Modifier,
 ) {
     val sectionHorizontalPadding = 4.dp
-    val partyStatItemWidth = 96.dp
 
     HomePanel(modifier.focusGroup()) {
         SectionTitle(R.drawable.ic_home_jiceng)
@@ -825,60 +824,18 @@ private fun PartyWorkPanel(
                 .padding(horizontal = sectionHorizontalPadding),
             verticalArrangement = Arrangement.SpaceEvenly,
         ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                partyStats.take(4).forEachIndexed { index, stat ->
-                    PartyStatItem(
-                        stat = stat,
-                        modifier = Modifier
-                            .width(partyStatItemWidth)
-                            .then(
-                                if (index == 0) {
-                                    Modifier.focusRequester(firstItemFocusRequester)
-                                } else {
-                                    Modifier
-                                },
-                            )
-                            .focusProperties {
-                                if (index == 0) {
-                                    left = videoControlFocusRequester
-                                }
-                                if (topFocusRequester != null) {
-                                    up = topFocusRequester
-                                }
-                            },
-                        onClick = { onPartyBuildingClick(stat.channelId) },
-                    )
-                }
-            }
-            val secondRowStats = partyStats.drop(4).take(4)
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-            ) {
-                secondRowStats.forEachIndexed { index, stat ->
-                    PartyStatItem(
-                        stat = stat,
-                        modifier = Modifier
-                            .width(partyStatItemWidth)
-                            .then(
-                                if (index == 0) {
-                                    Modifier.focusProperties {
-                                        left = videoControlFocusRequester
-                                    }
-                                } else {
-                                    Modifier
-                                },
-                            ),
-                        onClick = { onPartyBuildingClick(stat.channelId) },
-                    )
-                }
-                repeat(4 - secondRowStats.size) {
-                    Spacer(Modifier.width(partyStatItemWidth))
-                }
-            }
+            PartyStatRow(
+                stats = partyStats.take(4),
+                leftFocusRequester = videoControlFocusRequester,
+                initialFocusRequester = firstItemFocusRequester,
+                upFocusRequester = topFocusRequester,
+                onItemClick = onPartyBuildingClick,
+            )
+            PartyStatRow(
+                stats = partyStats.drop(4).take(4),
+                leftFocusRequester = videoControlFocusRequester,
+                onItemClick = onPartyBuildingClick,
+            )
         }
 
         Row(verticalAlignment = Alignment.CenterVertically) {
@@ -936,6 +893,45 @@ private fun PartyWorkPanel(
 }
 
 @Composable
+private fun PartyStatRow(
+    stats: List<PartyStat>,
+    leftFocusRequester: FocusRequester,
+    initialFocusRequester: FocusRequester? = null,
+    upFocusRequester: FocusRequester? = null,
+    onItemClick: (Int) -> Unit,
+) {
+    if (stats.isEmpty()) return
+
+    fun itemModifier(index: Int, base: Modifier): Modifier {
+        var result = base
+        if (index == 0 && initialFocusRequester != null) {
+            result = result.focusRequester(initialFocusRequester)
+        }
+        return result.focusProperties {
+            if (index == 0) {
+                left = leftFocusRequester
+            }
+            if (upFocusRequester != null) {
+                up = upFocusRequester
+            }
+        }
+    }
+
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        stats.forEachIndexed { index, stat ->
+            PartyStatItem(
+                stat = stat,
+                modifier = itemModifier(index, Modifier),
+                onClick = { onItemClick(stat.channelId) },
+            )
+        }
+    }
+}
+
+@Composable
 private fun PartyStatItem(
     stat: PartyStat,
     modifier: Modifier = Modifier,
@@ -945,28 +941,28 @@ private fun PartyStatItem(
         modifier = modifier,
         onClick = onClick,
     ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 1.dp),
-            horizontalAlignment = Alignment.CenterHorizontally,
+        Box(
+            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+            contentAlignment = Alignment.Center,
         ) {
-            Image(
-                painter = painterResource(stat.icon),
-                contentDescription = "",
-                contentScale = ContentScale.Fit,
-                modifier = Modifier.size(width = 32.dp, height = 28.dp),
-            )
-            Text(
-                text = stat.title,
-                color = Color(0xFFF8EAEA),
-                fontSize = 11.sp,
-                lineHeight = 13.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                textAlign = TextAlign.Center,
-            )
+            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                Image(
+                    painter = painterResource(stat.icon),
+                    contentDescription = "",
+                    contentScale = ContentScale.Fit,
+                    modifier = Modifier.size(width = 32.dp, height = 28.dp),
+                )
+                Text(
+                    text = stat.title,
+                    color = Color(0xFFF8EAEA),
+                    fontSize = 11.sp,
+                    lineHeight = 13.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    textAlign = TextAlign.Center,
+                )
+            }
         }
     }
 }
