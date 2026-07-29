@@ -462,6 +462,7 @@ private fun TvActionButton(
     enabled: Boolean = true
 ) {
     var focused by remember { mutableStateOf(false) }
+    val clickFocusRequester = remember { FocusRequester() }
     val shape = RoundedCornerShape(22.dp)
     val backgroundColor = when {
         !enabled -> Color(0xFFE8E8E8)
@@ -485,7 +486,11 @@ private fun TvActionButton(
                 color = if (focused) Color(0xFFFFD186) else Color(0xFFD9D9D9),
                 shape = shape
             )
-            .clickable(enabled = enabled, onClick = onClick)
+            .focusRequester(clickFocusRequester)
+            .clickable(enabled = enabled) {
+                clickFocusRequester.requestFocus()
+                onClick()
+            }
             .padding(horizontal = 18.dp),
         contentAlignment = Alignment.Center
     ) {

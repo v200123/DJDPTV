@@ -5,6 +5,7 @@ import android.graphics.Color
 import android.os.Bundle
 import android.util.Log
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.ViewGroup
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
@@ -44,7 +45,10 @@ class NativeWebViewTestActivity : ComponentActivity() {
         }
         val reloadButton = Button(this).apply {
             text = "Reload"
-            setOnClickListener { webView.reload() }
+            setOnClickListener {
+                requestFocus()
+                webView.reload()
+            }
         }
         val toolbar = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -98,6 +102,14 @@ class NativeWebViewTestActivity : ComponentActivity() {
     private fun createWebView(): WebView = WebView(this).apply {
         if (BuildConfig.DEBUG) {
             WebView.setWebContentsDebuggingEnabled(true)
+        }
+        isFocusable = true
+        isFocusableInTouchMode = true
+        setOnTouchListener { view, event ->
+            if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+                view.requestFocus()
+            }
+            false
         }
         webViewClient = object : WebViewClient() {
             override fun onPageFinished(view: WebView, url: String?) {

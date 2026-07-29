@@ -243,8 +243,7 @@ fun DangJianTvScreen() {
                     .fillMaxWidth()
                     .onFocusChanged { headerHasFocus = it.hasFocus },
             )
-            Spacer(modifier = Modifier.height(12.dp))
-
+            Spacer(modifier = Modifier.height(6.dp))
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -292,7 +291,7 @@ fun DangJianTvScreen() {
                             },
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(50.dp, 0.dp)
+                                .padding(50.dp,0.dp,50.dp, 10.dp)
                                 .zIndex(if (webIsActive) 1f else 0f),
                         )
                     }

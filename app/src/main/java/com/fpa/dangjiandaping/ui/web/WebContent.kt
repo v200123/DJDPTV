@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.graphics.Color
 import android.util.Log
 import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
@@ -143,6 +144,7 @@ internal fun WebContent(
     var loadingUrl by remember { mutableStateOf<String?>(url) }
     var newsDetail by remember(url) { mutableStateOf<NewsDetail?>(null) }
     var serviceTeam by remember(url) { mutableStateOf<ServiceTeam?>(null) }
+    var webViewDialogUrl by remember(url) { mutableStateOf<String?>(null) }
 
 //    LaunchedEffect(Unit) {
 //        // WebView 首次初始化较重，至少让顶部原生界面先完成一帧绘制。
@@ -167,16 +169,22 @@ internal fun WebContent(
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { context ->
-                    if (BuildConfig.DEBUG) {
-                        WebView.setWebContentsDebuggingEnabled(true)
-                        Log.i(WEB_LOG_TAG, "WebView remote debugging enabled")
-                    }
+//                    if (BuildConfig.DEBUG) {
+//                        WebView.setWebContentsDebuggingEnabled(true)
+//                        Log.i(WEB_LOG_TAG, "WebView remote debugging enabled")
+//                    }
                     WebView(context).apply {
                         layoutParams = ViewGroup.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
                         )
                         setBackgroundColor(Color.TRANSPARENT)
+                        setOnTouchListener { view, event ->
+                            if (event.actionMasked == MotionEvent.ACTION_DOWN) {
+                                view.requestFocus()
+                            }
+                            false
+                        }
 //                        isActivated = active
 //                        isFocusable = active
 //                        isFocusableInTouchMode = active
@@ -235,9 +243,7 @@ internal fun WebContent(
                                 },
                                 onShowWebViewUrl = { requestedUrl ->
                                     if (requestedUrl.isNotEmpty()) {
-                                        context.startActivity(
-                                            FullscreenWebViewActivity.newIntent(context, requestedUrl)
-                                        )
+                                        webViewDialogUrl = requestedUrl
                                     }
                                 },
                             ),
@@ -369,6 +375,13 @@ internal fun WebContent(
             ServiceTeamDialog(
                 team = team,
                 onDismiss = { serviceTeam = null },
+            )
+        }
+
+        webViewDialogUrl?.let { requestedUrl ->
+            WebViewDialog(
+                url = requestedUrl,
+                onDismiss = { webViewDialogUrl = null },
             )
         }
 

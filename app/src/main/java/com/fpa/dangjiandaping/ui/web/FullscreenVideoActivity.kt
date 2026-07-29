@@ -1,5 +1,7 @@
 package com.fpa.dangjiandaping.ui.web
 
+import android.R.attr.text
+import android.R.attr.textSize
 import android.app.Activity
 import android.content.Context
 import android.content.Intent
@@ -144,33 +146,24 @@ class FullscreenVideoActivity : Activity() {
             }
         }
 
-    private fun createExitButton(): Button =
-        Button(this).apply {
+    private fun createExitButton(): TextView =
+        TextView(this).apply {
             text = "退出"
             textSize = 18f
             setTextColor(Color.WHITE)
             isAllCaps = false
             isFocusable = true
             isFocusableInTouchMode = true
-            backgroundTintList = ColorStateList(
-                arrayOf(
-                    intArrayOf(android.R.attr.state_focused),
-                    intArrayOf(android.R.attr.state_pressed),
-                    intArrayOf(),
-                ),
-                intArrayOf(
-                    Color.rgb(215, 25, 32),
-                    Color.rgb(215, 25, 32),
-                    Color.argb(230, 105, 13, 11),
-                ),
-            )
-            setOnClickListener { finish() }
+            setOnClickListener {
+                requestFocus()
+                finish()
+            }
             layoutParams = FrameLayout.LayoutParams(
                 dp(112),
                 dp(48),
                 Gravity.END or Gravity.TOP,
             ).apply {
-                setMargins(0, 0, dp(24), dp(12))
+                setMargins(0, dp(16), dp(24), 0)
             }
         }
 

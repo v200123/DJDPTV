@@ -104,7 +104,7 @@ private fun HeaderBrandRow(modifier: Modifier = Modifier) {
         modifier = modifier,
         contentAlignment = Alignment.TopEnd
     ) {
-        Column(horizontalAlignment = Alignment.End) {
+        Column(horizontalAlignment = Alignment.End, modifier = Modifier.offset(0.dp,10.dp)) {
             Text("中共甘孜州委组织部", color = Color(0xFFFFD186), fontSize = 12.sp)
             Text(currentDateText(), color = Color(0xFFFFD186), fontSize = 10.sp)
         }
@@ -178,7 +178,10 @@ private fun HeaderTabRow(
                     .selectable(
                         selected = selectedTab == index,
                         interactionSource = null,
-                        onClick = { onTabSelected(index) },
+                        onClick = {
+                            tabFocusRequesters[index].requestFocus()
+                            onTabSelected(index)
+                        },
                         role = Role.Tab,
                         indication = null,
                     ),

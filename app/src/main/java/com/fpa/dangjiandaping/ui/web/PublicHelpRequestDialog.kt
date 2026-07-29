@@ -564,6 +564,7 @@ private fun HelpActionButton(
     compact: Boolean = false,
 ) {
     var focused by remember { mutableStateOf(false) }
+    val clickFocusRequester = remember { FocusRequester() }
     val scale by animateFloatAsState(
         targetValue = if (focused) 1.035f else 1f,
         label = "helpActionScale",
@@ -585,7 +586,11 @@ private fun HelpActionButton(
                 color = if (focused) Color(0xFFFFD27A) else Color(0xFF33415A),
                 shape = shape,
             )
-            .clickable(role = Role.Button, onClick = onClick)
+            .focusRequester(clickFocusRequester)
+            .clickable(role = Role.Button) {
+                clickFocusRequester.requestFocus()
+                onClick()
+            }
             .padding(horizontal = if (compact) 0.dp else 18.dp),
         contentAlignment = Alignment.Center,
     ) {

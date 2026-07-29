@@ -72,7 +72,7 @@ import androidx.compose.ui.zIndex
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.fpa.dangjiandaping.R
-import com.fpa.dangjiandaping.ui.web.FullscreenWebViewActivity
+import com.fpa.dangjiandaping.ui.web.WebViewDialog
 import com.shuyu.gsyvideoplayer.compose.native_.GSYPlayState
 import com.shuyu.gsyvideoplayer.compose.native_.GSYPlayerSurface
 import com.shuyu.gsyvideoplayer.compose.native_.rememberGSYPlayerController
@@ -113,6 +113,7 @@ internal val defaultPartyStats = listOf(
     PartyStat(R.drawable.ic_home_qiyedangjian, "企业党建", 26, 10903),
     PartyStat(R.drawable.ic_home_xinxinglingyu, "新兴领域", 154, 10901),
     PartyStat(R.drawable.ic_home_dangyuanjiaoyu, "党员教育动态", 105, 8565),
+    PartyStat(R.drawable.ic_home_dangjian_qita, "其他", 105, 10913),
 )
 
 private data class CadreTask(val name: String, val duty: String, val date: String)
@@ -133,11 +134,11 @@ internal fun HomeScreen(
     onCoursewareClick: (Int) -> Unit = {},
     onPartyBuildingClick: (Int) -> Unit = {},
 ) {
-    val context = LocalContext.current
     val lastTopicFocusRequester = remember { FocusRequester() }
     val fullscreenFocusRequester = remember { FocusRequester() }
     val videoControlFocusRequester = remember { FocusRequester() }
     val firstPartyBuildingFocusRequester = remember { FocusRequester() }
+    var webViewDialogUrl by remember { mutableStateOf<String?>(null) }
 
     Box(
         modifier = modifier
@@ -205,9 +206,7 @@ internal fun HomeScreen(
                 TopicPanel(
                     lastTopicFocusRequester = lastTopicFocusRequester,
                     videoControlFocusRequester = videoControlFocusRequester,
-                    onOpenUrl = { url ->
-                        context.startActivity(FullscreenWebViewActivity.newIntent(context, url))
-                    },
+                    onOpenUrl = { url -> webViewDialogUrl = url },
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight(),
@@ -220,6 +219,13 @@ internal fun HomeScreen(
                         .fillMaxHeight(),
                 )
             }
+        }
+
+        webViewDialogUrl?.let { url ->
+            WebViewDialog(
+                url = url,
+                onDismiss = { webViewDialogUrl = null },
+            )
         }
     }
 }
@@ -686,19 +692,23 @@ private fun SeekBar(
     onDragFinished: (Float) -> Unit,
     modifier: Modifier = Modifier,
 ) {
+    val clickFocusRequester = remember { FocusRequester() }
     Canvas(
         modifier = modifier
             .height(24.dp)
-            .pointerInput(Unit) {
+            .focusRequester(clickFocusRequester)
+            .pointerInput(clickFocusRequester) {
                 detectTapGestures(
                     onPress = { offset ->
+                        clickFocusRequester.requestFocus()
                         val fraction = (offset.x / size.width).coerceIn(0f, 1f)
                         onDragChanged(fraction)
                         tryAwaitRelease()
                         onDragFinished(fraction)
                     },
                 )
-            },
+            }
+            .focusable(),
     ) {
         val centerY = size.height / 2f
         val trackHeight = 3.dp.toPx()
@@ -771,6 +781,7 @@ private fun FocusableAction(
     content: @Composable (focused: Boolean) -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
+    val clickFocusRequester = remember { FocusRequester() }
     val scale by animateFloatAsState(if (focused) 1.12f else 1f, label = "homeActionScale")
     val background by animateColorAsState(if (focused) focusedColor else normalColor, label = "homeActionColor")
 
@@ -781,7 +792,11 @@ private fun FocusableAction(
             .background(background)
             .then(if (focused) Modifier.border(2.dp, Gold, shape) else Modifier)
             .onFocusChanged { focused = it.isFocused }
-            .clickable(onClick = onClick)
+            .focusRequester(clickFocusRequester)
+            .clickable {
+                clickFocusRequester.requestFocus()
+                onClick()
+            }
             .focusable(),
         contentAlignment = Alignment.Center,
     ) {
@@ -808,8 +823,8 @@ private fun PartyWorkPanel(
             Row(Modifier.fillMaxWidth()) {
                 partyStats.take(4).forEachIndexed { index, stat ->
                     PartyStatItem(
-                        stat,
-                        Modifier
+                        stat = stat,
+                        modifier = Modifier
                             .weight(1f)
                             .then(
                                 if (index == 0) {
@@ -830,15 +845,18 @@ private fun PartyWorkPanel(
                     )
                 }
             }
+            val secondRowStats = partyStats.drop(4).take(4)
             Row(Modifier.fillMaxWidth()) {
-                partyStats.drop(4).forEachIndexed { index, stat ->
+                secondRowStats.forEachIndexed { index, stat ->
                     PartyStatItem(
                         stat = stat,
                         modifier = Modifier
                             .weight(1f)
                             .then(
                                 if (index == 0) {
-                                    Modifier.focusProperties { left = videoControlFocusRequester }
+                                    Modifier.focusProperties {
+                                        left = videoControlFocusRequester
+                                    }
                                 } else {
                                     Modifier
                                 },
@@ -846,7 +864,9 @@ private fun PartyWorkPanel(
                         onClick = { onPartyBuildingClick(stat.channelId) },
                     )
                 }
-                Spacer(Modifier.weight(1f))
+                repeat(4 - secondRowStats.size) {
+                    Spacer(Modifier.weight(1f))
+                }
             }
         }
 
@@ -886,7 +906,11 @@ private fun PartyWorkPanel(
                             overflow = TextOverflow.Ellipsis,
                             modifier = Modifier.weight(1f),
                         )
-                        Text(task.date, color = Color.White, fontSize = 10.sp)
+                        Text(
+                            task.date,
+                            color = Color.White,
+                            fontSize = 10.sp,
+                        )
                     }
                 }
             }
@@ -904,19 +928,27 @@ private fun PartyStatItem(
         modifier = modifier,
         onClick = onClick,
     ) {
-        Row(
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 4.dp, vertical = 1.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Image(painterResource(stat.icon), contentDescription = "", contentScale = ContentScale.Fit, modifier = Modifier.size(42.dp,40.dp))
-            Spacer(Modifier.width(7.dp))
+            Image(
+                painter = painterResource(stat.icon),
+                contentDescription = "",
+                contentScale = ContentScale.Fit,
+                modifier = Modifier.size(width = 32.dp, height = 28.dp),
+            )
             Text(
                 text = stat.title,
                 color = Color(0xFFF8EAEA),
-                fontSize = 12.sp,
+                fontSize = 11.sp,
+                lineHeight = 13.sp,
                 fontWeight = FontWeight.Bold,
-                lineHeight = 15.sp,
-                maxLines = 2,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                textAlign = TextAlign.Center,
             )
         }
     }
@@ -929,17 +961,28 @@ private fun PartyPanelFocusableItem(
     content: @Composable () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val scale by animateFloatAsState(if (focused) 1.04f else 1f, label = "partyPanelItemScale")
+    val clickFocusRequester = remember { FocusRequester() }
+    val scale by animateFloatAsState(
+        if (focused) 1.04f else 1f,
+        label = "partyPanelItemScale",
+    )
     val shape = RoundedCornerShape(6.dp)
 
     Box(
         modifier = modifier
-            .graphicsLayer { scaleX = scale; scaleY = scale }
+            .graphicsLayer {
+                scaleX = scale
+                scaleY = scale
+            }
             .clip(shape)
             .background(if (focused) Color(0x33FFFFFF) else Color.Transparent)
             .then(if (focused) Modifier.border(2.dp, Gold, shape) else Modifier)
             .onFocusChanged { focused = it.isFocused }
-            .clickable(onClick = onClick)
+            .focusRequester(clickFocusRequester)
+            .clickable {
+                clickFocusRequester.requestFocus()
+                onClick()
+            }
             .focusable(),
     ) {
         content()
@@ -955,7 +998,7 @@ private fun TopicPanel(
 ) {
     HomePanel(modifier) {
         SectionTitle(R.drawable.ic_home_zhuantizhuanlan)
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(4.dp))
         Row(
             modifier = Modifier.fillMaxSize().padding(0.dp,0.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -996,7 +1039,7 @@ private fun FeatureCard(
         Image(
             painter = painterResource(image),
             contentScale = ContentScale.FillBounds,
-            modifier = Modifier.fillMaxSize().height(65.dp),
+            modifier = Modifier.height(65.dp),
             contentDescription = null,
         )
     }
@@ -1010,33 +1053,55 @@ private fun CoursewarePanel(
 ) {
     HomePanel(modifier) {
         SectionTitle(R.drawable.ic_home_zuixinkejian)
-        Spacer(Modifier.height(8.dp))
+        Spacer(Modifier.height(4.dp))
         Row(
             modifier = Modifier.fillMaxSize(),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            CourseCard(
-                "",
-                "",
-                Color(0xFFA31712),
-                R.drawable.ic_home_kejian_01,
-                Modifier.focusProperties { left = leftTopicFocusRequester },
+            FeatureCard(
+                modifier = Modifier
+                    .weight(1f)
+                    .focusProperties { up = leftTopicFocusRequester },
+                image = R.drawable.ic_home_kejian_01,
                 onClick = { onCoursewareClick(1) },
             )
-            CourseCard("",
-                "",
-                Color(0xFF294581),
-                R.drawable.ic_home_kejian_02,
-                Modifier,
+            FeatureCard(
+                modifier = Modifier
+                    .weight(1f)
+                    .focusProperties { up = leftTopicFocusRequester },
+                image = R.drawable.ic_home_kejian_02,
                 onClick = { onCoursewareClick(2) },
             )
-            CourseCard("",
-                "",
-                Color(0xFF185E2F),
-                R.drawable.ic_home_kejian_03,
-                Modifier,
-                onClick = { onCoursewareClick(3) },
+            FeatureCard(
+                    modifier = Modifier
+                        .weight(1f)
+                        .focusProperties { up = leftTopicFocusRequester },
+            image = R.drawable.ic_home_kejian_03,
+            onClick = { onCoursewareClick(3) },
             )
+
+//            CourseCard(
+//                "",
+//                "",
+//                Color(0xFFA31712),
+//                R.drawable.ic_home_kejian_01,
+//                Modifier.focusProperties { left = leftTopicFocusRequester },
+//                onClick = { onCoursewareClick(1) },
+//            )
+//            CourseCard("",
+//                "",
+//                Color(0xFF294581),
+//                R.drawable.ic_home_kejian_02,
+//                Modifier,
+//                onClick = { onCoursewareClick(2) },
+//            )
+//            CourseCard("",
+//                "",
+//                Color(0xFF185E2F),
+//                R.drawable.ic_home_kejian_03,
+//                Modifier,
+//                onClick = { onCoursewareClick(3) },
+//            )
         }
     }
 }
@@ -1075,9 +1140,9 @@ private fun CourseCard(
     FocusableTile(modifier, onClick) {
         Box(
             Modifier
-                .size(135.dp, 65.dp)
+                .size( 65.dp)
         ) {
-            Image(painterResource(icon), contentDescription = "", contentScale = ContentScale.FillBounds, modifier = Modifier.size(135.dp, 65.dp))
+            Image(painterResource(icon), contentDescription = "", contentScale = ContentScale.Fit, modifier = Modifier.height(65.dp))
             Column(Modifier.align(Alignment.BottomCenter), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(title, color = titleTextColor, fontSize = 12.sp, fontWeight = FontWeight.Black, maxLines = 1)
                 Text(subtitle, color = Color(0xFFEC9649), fontSize = 10.sp, fontWeight = FontWeight.Bold)
@@ -1093,6 +1158,7 @@ private fun FocusableTile(
     content: @Composable () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
+    val clickFocusRequester = remember { FocusRequester() }
     val scale by animateFloatAsState(if (focused) 1.10f else 1f, label = "homeTileScale")
 
     Box(
@@ -1103,7 +1169,11 @@ private fun FocusableTile(
             .clip(RoundedCornerShape(8.dp))
             .then(if (focused) Modifier.border(3.dp, BrightGold, RoundedCornerShape(8.dp)) else Modifier)
             .onFocusChanged { focused = it.isFocused }
-            .clickable(onClick = onClick)
+            .focusRequester(clickFocusRequester)
+            .clickable {
+                clickFocusRequester.requestFocus()
+                onClick()
+            }
             .focusable(),
     ) {
         content()

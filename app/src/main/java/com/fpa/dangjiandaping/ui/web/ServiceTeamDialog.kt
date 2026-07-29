@@ -326,6 +326,7 @@ private fun DialogActionButton(
     modifier: Modifier = Modifier,
 ) {
     var focused by remember { mutableStateOf(false) }
+    val clickFocusRequester = remember { FocusRequester() }
     val scale by animateFloatAsState(if (focused) 1.05f else 1f, label = "serviceTeamActionScale")
     val shape = RoundedCornerShape(8.dp)
     Box(
@@ -336,7 +337,11 @@ private fun DialogActionButton(
             .clip(shape)
             .background(color)
             .border(if (focused) 2.dp else 0.dp, Color(0xFFFFD889), shape)
-            .clickable(onClick = onClick)
+            .focusRequester(clickFocusRequester)
+            .clickable {
+                clickFocusRequester.requestFocus()
+                onClick()
+            }
             .padding(horizontal = 16.dp),
         contentAlignment = Alignment.Center,
     ) {
