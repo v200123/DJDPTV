@@ -3,6 +3,8 @@ package com.fpa.dangjiandaping.ui.screen
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.media.AudioManager
+import android.media.ToneGenerator
 import android.view.KeyEvent
 import android.view.SoundEffectConstants
 import android.view.View
@@ -60,11 +62,18 @@ import com.fpa.dangjiandaping.ui.navigation.toRoute
 import com.fpa.dangjiandaping.ui.web.PublicHelpRequest
 import com.fpa.dangjiandaping.ui.web.PublicHelpRequestDialog
 import com.fpa.dangjiandaping.ui.web.WebContent
+import com.fpa.dangjiandaping.ui.web.mockPublicHelpRequests
+import kotlinx.coroutines.delay
+import kotlin.random.Random
 
 private const val HOME_TAB_INDEX = 0
+private const val MOCK_HELP_MIN_DELAY_MILLIS = 5_000L
+private const val MOCK_HELP_MAX_DELAY_MILLIS = 12_001L
 
 @Composable
-fun DangJianTvScreen() {
+fun DangJianTvScreen(
+    manualHelpTrigger: Int = 0,
+) {
     val backStack = rememberNavBackStack(HomeRoute)
     val currentRoute = (backStack.lastOrNull() as? TvRoute) ?: HomeRoute
     val selectedTab = when (currentRoute) {
@@ -183,6 +192,37 @@ fun DangJianTvScreen() {
         }
     }
 
+    LaunchedEffect(Unit) {
+        if (isInPreview || mockPublicHelpRequests.isEmpty()) return@LaunchedEffect
+
+        delay(
+            Random.nextLong(
+                from = MOCK_HELP_MIN_DELAY_MILLIS,
+                until = MOCK_HELP_MAX_DELAY_MILLIS,
+            ),
+        )
+        while (publicHelpRequest != null) {
+            delay(1_000L)
+        }
+        publicHelpRequest = mockPublicHelpRequests.random()
+    }
+
+    LaunchedEffect(manualHelpTrigger) {
+        if (isInPreview || manualHelpTrigger <= 0 || mockPublicHelpRequests.isEmpty()) {
+            return@LaunchedEffect
+        }
+        val otherRequests = mockPublicHelpRequests.filterNot {
+            it.id == publicHelpRequest?.id
+        }
+        publicHelpRequest = (otherRequests.ifEmpty { mockPublicHelpRequests }).random()
+    }
+
+    LaunchedEffect(publicHelpRequest?.id) {
+        if (!isInPreview && publicHelpRequest != null) {
+            playPublicHelpAlertTone()
+        }
+    }
+
     LaunchedEffect(currentRoute, pendingContentFocusRoute, webView) {
         canWebViewGoBack = false
         if (pendingContentFocusRoute == currentRoute) {
@@ -251,18 +291,17 @@ fun DangJianTvScreen() {
                     .clipToBounds(),
             ) {
                 val homeIsActive = currentRoute == HomeRoute
-                if (homeIsActive) {
-                    HomeScreen(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .zIndex(1f),
-                        partyStats = partyStats,
-                        contentFocusRequester = contentFocusRequester,
-                        onRequestTabFocus = ::requestSelectedTabFocus,
-                        onCoursewareClick = ::openCourseware,
-                        onPartyBuildingClick = ::openPartyBuilding,
-                    )
-                }
+                HomeScreen(
+                    active = homeIsActive,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .zIndex(if (homeIsActive) 1f else 0f),
+                    partyStats = partyStats,
+                    contentFocusRequester = contentFocusRequester,
+                    onRequestTabFocus = ::requestSelectedTabFocus,
+                    onCoursewareClick = ::openCourseware,
+                    onPartyBuildingClick = ::openPartyBuilding,
+                )
 
                 TV_TABS.forEachIndexed { tabIndex, tab ->
                     val defaultRoute =
@@ -307,6 +346,21 @@ fun DangJianTvScreen() {
                 onContactLater = { publicHelpRequest = null },
             )
         }
+    }
+}
+
+private suspend fun playPublicHelpAlertTone() {
+    val toneGenerator = runCatching {
+        ToneGenerator(AudioManager.STREAM_MUSIC, 100)
+    }.getOrNull() ?: return
+
+    try {
+        toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP2, 380)
+        delay(520L)
+        toneGenerator.startTone(ToneGenerator.TONE_PROP_BEEP2, 520)
+        delay(600L)
+    } finally {
+        toneGenerator.release()
     }
 }
 

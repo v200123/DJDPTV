@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,6 +38,19 @@ import com.fpa.dangjiandaping.BuildConfig
 
 private const val FOCUS_LOG_TAG = "FocusTrace"
 private const val WEB_LOG_TAG = "WebContent"
+private const val CAPTURE_WEB_FOCUS_SCRIPT =
+    "(function(){var old=document.querySelector('[data-android-focus-return]');" +
+        "if(old){old.removeAttribute('data-android-focus-return');}" +
+        "var el=document.activeElement;" +
+        "if(el&&el!==document.body&&el!==document.documentElement){" +
+        "el.setAttribute('data-android-focus-return','true');window.__androidFocusReturnElement=el;}})();"
+private const val RESTORE_WEB_FOCUS_SCRIPT =
+    "(function(){var el=window.__androidFocusReturnElement||" +
+        "document.querySelector('[data-android-focus-return]');" +
+        "if(el&&document.documentElement.contains(el)){" +
+        "try{el.focus({preventScroll:true});}catch(e){el.focus();}" +
+        "try{el.scrollIntoView({block:'nearest',inline:'nearest'});}catch(e){}" +
+        "return true;}return false;})();"
 
 private class WebFocusBridge(
     private val webView: WebView,
@@ -77,8 +91,10 @@ private class WebFocusBridge(
     fun showServiceTeam(teamJson: String) {
         Log.d(WEB_LOG_TAG, "H5 called showServiceTeam${teamJson}")
         webView.post {
-            webView.clearFocus()
-            onShowServiceTeam(teamJson)
+            webView.evaluateJavascript(CAPTURE_WEB_FOCUS_SCRIPT) {
+                webView.clearFocus()
+                onShowServiceTeam(teamJson)
+            }
         }
     }
 
@@ -145,6 +161,22 @@ internal fun WebContent(
     var newsDetail by remember(url) { mutableStateOf<NewsDetail?>(null) }
     var serviceTeam by remember(url) { mutableStateOf<ServiceTeam?>(null) }
     var webViewDialogUrl by remember(url) { mutableStateOf<String?>(null) }
+    var restoreServiceTeamFocus by remember(url) { mutableStateOf(false) }
+    val webViewHolder = remember { arrayOfNulls<WebView>(1) }
+
+    LaunchedEffect(serviceTeam, restoreServiceTeamFocus) {
+        if (serviceTeam == null && restoreServiceTeamFocus) {
+            webViewHolder[0]?.let { webView ->
+                webView.isFocusable = true
+                webView.isFocusableInTouchMode = true
+                webView.requestFocus()
+                webView.evaluateJavascript(RESTORE_WEB_FOCUS_SCRIPT) { restored ->
+                    Log.d(FOCUS_LOG_TAG, "Service team dialog focus restored=$restored")
+                }
+            }
+            restoreServiceTeamFocus = false
+        }
+    }
 
 //    LaunchedEffect(Unit) {
 //        // WebView 首次初始化较重，至少让顶部原生界面先完成一帧绘制。
@@ -174,6 +206,7 @@ internal fun WebContent(
 //                        Log.i(WEB_LOG_TAG, "WebView remote debugging enabled")
 //                    }
                     WebView(context).apply {
+                        webViewHolder[0] = this
                         layoutParams = ViewGroup.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
@@ -346,6 +379,9 @@ internal fun WebContent(
                     }
                 },
                 onRelease = { view ->
+                    if (webViewHolder[0] === view) {
+                        webViewHolder[0] = null
+                    }
                     onCanGoBackChanged(false)
                     onReleased(view)
                     view.stopLoading()
@@ -374,7 +410,10 @@ internal fun WebContent(
         serviceTeam?.let { team ->
             ServiceTeamDialog(
                 team = team,
-                onDismiss = { serviceTeam = null },
+                onDismiss = {
+                    serviceTeam = null
+                    restoreServiceTeamFocus = true
+                },
             )
         }
 

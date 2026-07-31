@@ -1,11 +1,13 @@
 package com.fpa.dangjiandaping.ui.web
 
 import android.graphics.BitmapFactory
+import android.net.Uri
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,12 +22,15 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.focusable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -37,6 +42,11 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -48,10 +58,13 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.Text
 import androidx.tv.material3.MaterialTheme
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URL
+
+private const val SERVICE_TEAM_IMAGE_BASE_URL = "https://www.xyxf.gov.cn/prod-api/image/"
 
 internal data class ServiceTeam(
     val name: String,
@@ -85,14 +98,43 @@ internal data class ServiceTeamMember(
  */
 internal fun parseServiceTeam(json: String): ServiceTeam {
     val record = unwrapRecord(JSONObject(json))
+    val services = record.stringListOf("services", "serviceItems", "tags", "serviceTypes")
+        .ifEmpty { record.objectStringListOf("labelsList", valueKeys = arrayOf("name", "labelName")) }
+    val members = record.objectListOf(
+        "members",
+        "membersList",
+        "teamMembers",
+        "teamMemberList",
+        "memberList",
+        "serviceMembers",
+        "serviceTeamMembers",
+        "partyMembers",
+        "partyMemberList",
+        "personList",
+    ).map(::parseServiceTeamMember).ifEmpty {
+        val contactName = record.stringOf("contactName", "linkman", "contact")
+        val contactPhone = record.stringOf("contactPhone", "linkPhone", "mobile", "phone")
+        if (contactName.isBlank() && contactPhone.isBlank()) {
+            emptyList()
+        } else {
+            listOf(
+                ServiceTeamMember(
+                    name = contactName.ifBlank { "服务队联系人" },
+                    role = "服务队联系人",
+                    avatarUrl = "",
+                    phone = contactPhone,
+                    services = services,
+                ),
+            )
+        }
+    }
     return ServiceTeam(
         name = record.stringOf("name", "teamName", "title", "serviceTeamName")
             .ifBlank { "党员服务队" },
-        services = record.stringListOf("services", "serviceItems", "tags", "serviceTypes"),
-        introduction = record.stringOf("introduction", "intro", "description", "content"),
-        photos = record.stringListOf("photos", "images", "teamPhotos", "photoUrls"),
-        members = record.objectListOf("members", "teamMembers", "memberList", "serviceMembers")
-            .map(::parseServiceTeamMember),
+        services = services,
+        introduction = record.stringOf("summary", "introduction", "intro", "description", "content"),
+        photos = record.imageUrlListOf("image", "photos", "images", "teamPhotos", "photoUrls"),
+        members = members,
         navigationUrl = record.stringOf("navigationUrl", "navigation", "mapUrl", "locationUrl"),
         helpUrl = record.stringOf("helpUrl", "help", "helpPageUrl"),
     )
@@ -105,10 +147,10 @@ private fun unwrapRecord(root: JSONObject): JSONObject =
         ?: root
 
 private fun parseServiceTeamMember(record: JSONObject): ServiceTeamMember = ServiceTeamMember(
-    name = record.stringOf("name", "memberName", "realName").ifBlank { "服务队成员" },
-    role = record.stringOf("role", "position", "job", "duty"),
-    avatarUrl = record.stringOf("avatarUrl", "avatar", "photo", "image", "headImage"),
-    phone = record.stringOf("phone", "mobile", "telephone", "tel"),
+    name = record.stringOf("name", "memberName", "realName", "contactName").ifBlank { "服务队成员" },
+    role = record.stringOf("role", "position", "job", "duty", "identity"),
+    avatarUrl = record.imageUrlListOf("avatarUrl", "avatar", "photo", "image", "headImage").firstOrNull().orEmpty(),
+    phone = record.stringOf("phone", "mobile", "telephone", "tel", "contactPhone"),
     services = record.stringListOf("services", "serviceItems", "tags", "serviceTypes"),
 )
 
@@ -131,9 +173,76 @@ private fun JSONObject.stringListOf(vararg keys: String): List<String> {
     return emptyList()
 }
 
-private fun JSONObject.objectListOf(vararg keys: String): List<JSONObject> {
+private fun JSONObject.objectStringListOf(
+    vararg keys: String,
+    valueKeys: Array<String>,
+): List<String> {
     for (key in keys) {
         val array = optJSONArray(key) ?: continue
+        val values = buildList {
+            for (index in 0 until array.length()) {
+                array.optJSONObject(index)
+                    ?.stringOf(*valueKeys)
+                    ?.takeIf { it.isNotBlank() }
+                    ?.let(::add)
+            }
+        }
+        if (values.isNotEmpty()) return values
+    }
+    return emptyList()
+}
+
+/**
+ * 接口的 image 字段是一个 JSON 数组字符串，例如：
+ * [{"fileId":"abc","filename":"服务队.jpg"}]
+ * fileId 需要拼接统一图片访问前缀。旧版直接传 URL 数组的格式仍然兼容。
+ */
+private fun JSONObject.imageUrlListOf(vararg keys: String): List<String> {
+    for (key in keys) {
+        val values = imageUrlsFromValue(opt(key))
+        if (values.isNotEmpty()) return values
+    }
+    return emptyList()
+}
+
+private fun imageUrlsFromValue(value: Any?): List<String> = when (value) {
+    is JSONArray -> buildList {
+        for (index in 0 until value.length()) {
+            addAll(imageUrlsFromValue(value.opt(index)))
+        }
+    }
+    is JSONObject -> {
+        val directUrl = value.stringOf("url", "imageUrl", "downloadUrl")
+        val fileId = value.stringOf("fileId")
+        when {
+            directUrl.isNotBlank() -> listOf(directUrl)
+            fileId.isNotBlank() -> listOf(SERVICE_TEAM_IMAGE_BASE_URL + Uri.encode(fileId))
+            else -> emptyList()
+        }
+    }
+    is String -> {
+        val text = value.trim()
+        when {
+            text.isBlank() -> emptyList()
+            text.startsWith("[") -> runCatching { imageUrlsFromValue(JSONArray(text)) }.getOrDefault(emptyList())
+            text.startsWith("{") -> runCatching { imageUrlsFromValue(JSONObject(text)) }.getOrDefault(emptyList())
+            text.startsWith("http://") || text.startsWith("https://") -> listOf(text)
+            else -> text.split(',', '，')
+                .map(String::trim)
+                .filter { it.startsWith("http://") || it.startsWith("https://") }
+        }
+    }
+    else -> emptyList()
+}
+
+private fun JSONObject.objectListOf(vararg keys: String): List<JSONObject> {
+    for (key in keys) {
+        val value = opt(key)
+        val array = when (value) {
+            is JSONArray -> value
+            is String -> runCatching { JSONArray(value) }.getOrNull()
+            else -> null
+        } ?: continue
         val values = buildList {
             for (index in 0 until array.length()) {
                 array.optJSONObject(index)?.let { add(it) }
@@ -160,92 +269,126 @@ internal fun ServiceTeamDialog(team: ServiceTeam, onDismiss: () -> Unit) {
 
 @Composable
 private fun ServiceTeamDialogContent(team: ServiceTeam, onDismiss: () -> Unit) {
-    val context = androidx.compose.ui.platform.LocalContext.current
     val closeFocusRequester = remember { FocusRequester() }
+    val contentFocusRequester = remember { FocusRequester() }
+    val contentListState = rememberLazyListState()
+    val coroutineScope = rememberCoroutineScope()
     Box(
         modifier = Modifier
-            .fillMaxWidth(0.82f)
-            .fillMaxHeight(0.88f)
-            .clip(RoundedCornerShape(8.dp))
-            .background(Color.White)
-            .padding(horizontal = 24.dp, vertical = 20.dp),
-    ) {
-        Column(Modifier.fillMaxWidth()) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(
-                    text = team.name,
-                    color = Color(0xFF202020),
-                    fontSize = 27.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.weight(1f),
-                )
-                DialogActionButton(
-                    text = "×",
-                    color = Color(0xFFF1F1F1),
-                    onClick = onDismiss,
-                    modifier = Modifier.focusRequester(closeFocusRequester),
-                )
-            }
-
-            Spacer(Modifier.height(10.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                if (team.services.isNotEmpty()) {
-                    ServiceLabels(team.services)
+            .fillMaxWidth(0.9f)
+            .fillMaxHeight(0.92f)
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color(0xFFB51F24))
+            .border(1.dp, Color(0xFFFFD889), RoundedCornerShape(16.dp))
+            .padding(horizontal = 28.dp, vertical = 22.dp)
+            .onPreviewKeyEvent { event ->
+                if (event.type != KeyEventType.KeyDown) {
+                    return@onPreviewKeyEvent false
                 }
-            }
-
-            Spacer(Modifier.height(14.dp))
-            LazyColumn(
-                modifier = Modifier.fillMaxWidth().weight(1f),
-                verticalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                if (team.introduction.isNotBlank()) {
-                    item {
-                        ServiceSection(title = "简介") {
-                            Text(
-                                text = team.introduction,
-                                color = Color(0xFF5E5E5E),
-                                fontSize = 17.sp,
-                                lineHeight = 25.sp,
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .clip(RoundedCornerShape(10.dp))
-                                    .background(Color(0xFFF5F5F5))
-                                    .padding(14.dp),
-                            )
+                when (event.key) {
+                    Key.DirectionDown -> {
+                        if (!contentListState.canScrollForward) {
+                            false
+                        } else {
+                            contentFocusRequester.requestFocus()
+                            coroutineScope.launch { contentListState.animateScrollBy(190f) }
+                            true
                         }
                     }
+                    Key.DirectionUp -> {
+                        if (!contentListState.canScrollBackward) {
+                            false
+                        } else {
+                            contentFocusRequester.requestFocus()
+                            coroutineScope.launch { contentListState.animateScrollBy(-190f) }
+                            true
+                        }
+                    }
+                    else -> false
                 }
-                if (team.photos.isNotEmpty()) {
-                    item {
-                        ServiceSection(title = "服务队照片") {
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                                items(team.photos) { photo ->
-                                    RemoteImage(
-                                        url = photo,
-                                        modifier = Modifier
-                                            .size(width = 180.dp, height = 110.dp)
-                                            .clip(RoundedCornerShape(10.dp)),
-                                    )
-                                }
+            },
+    ) {
+        LazyColumn(
+            state = contentListState,
+            modifier = Modifier
+                .fillMaxWidth()
+                .fillMaxHeight()
+                .focusRequester(contentFocusRequester)
+                .focusable(),
+            verticalArrangement = Arrangement.spacedBy(16.dp),
+        ) {
+            item {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = team.name,
+                        color = Color.White,
+                        fontSize = 29.sp,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.weight(1f),
+                    )
+                    DialogActionButton(
+                        text = "×",
+                        color = Color.White,
+                        onClick = onDismiss,
+                        modifier = Modifier.focusRequester(closeFocusRequester),
+                    )
+                }
+            }
+            if (team.services.isNotEmpty()) {
+                item {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        ServiceLabels(team.services)
+                    }
+                }
+            }
+            if (team.introduction.isNotBlank()) {
+                item {
+                    ServiceSection(title = "服务队简介") {
+                        Text(
+                            text = team.introduction,
+                            color = Color(0xFF5A2020),
+                            fontSize = 17.sp,
+                            lineHeight = 26.sp,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(Color(0xFFFFF7F2))
+                                .padding(16.dp),
+                        )
+                    }
+                }
+            }
+            if (team.photos.isNotEmpty()) {
+                item {
+                    ServiceSection(title = "服务队照片") {
+                        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                            items(team.photos) { photo ->
+                                RemoteImage(
+                                    url = photo,
+                                    modifier = Modifier
+                                        .size(width = 210.dp, height = 126.dp)
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .border(1.dp, Color(0xFFFFD889), RoundedCornerShape(12.dp)),
+                                )
                             }
                         }
                     }
                 }
-                if (team.members.isNotEmpty()) {
-                    item { SectionHeading("服务队成员") }
-                    items(team.members) { member ->
-                        ServiceTeamMemberCard(member = member)
-                    }
+            }
+            if (team.members.isNotEmpty()) {
+                item { SectionHeading("服务队成员") }
+                items(team.members) { member ->
+                    ServiceTeamMemberCard(member = member)
                 }
             }
+            item { Spacer(Modifier.height(4.dp)) }
         }
     }
     LaunchedEffect(team.name) { closeFocusRequester.requestFocus() }
@@ -267,9 +410,9 @@ private fun SectionHeading(title: String) {
                 .width(4.dp)
                 .height(22.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(Color(0xFFD83E3E)),
+                .background(Color(0xFFFFD889)),
         )
-        Text(title, fontSize = 21.sp, fontWeight = FontWeight.Bold, color = Color(0xFF262626))
+        Text(title, fontSize = 21.sp, fontWeight = FontWeight.Bold, color = Color.White)
     }
 }
 
@@ -279,9 +422,9 @@ private fun ServiceTeamMemberCard(member: ServiceTeamMember) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(Color(0xFFFAFAFA))
-            .border(1.dp, Color(0xFFEAEAEA), RoundedCornerShape(10.dp))
-            .padding(14.dp),
+            .background(Color(0xFFFFF7F2))
+            .border(1.dp, Color(0xFFFFD889), RoundedCornerShape(10.dp))
+            .padding(16.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -293,6 +436,7 @@ private fun ServiceTeamMemberCard(member: ServiceTeamMember) {
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
             Text("姓名：${member.name}", color = Color(0xFF1E1E1E), fontSize = 18.sp, fontWeight = FontWeight.Bold)
             if (member.role.isNotBlank()) Text("职务：${member.role}", color = Color(0xFF333333), fontSize = 16.sp)
+            if (member.phone.isNotBlank()) Text("联系电话：${member.phone}", color = Color(0xFF8E2525), fontSize = 16.sp)
             if (member.services.isNotEmpty()) ServiceLabels(member.services)
         }
     }
@@ -302,12 +446,16 @@ private fun ServiceTeamMemberCard(member: ServiceTeamMember) {
 private fun ServiceLabels(services: List<String>, modifier: Modifier = Modifier) {
     Text(
         text = services.take(4).mapIndexed { index, service -> "${serviceIcon(index)} $service" }.joinToString("   "),
-        color = Color(0xFF3C4C5B),
+        color = Color(0xFFFFF2C7),
         fontSize = 16.sp,
         fontWeight = FontWeight.Medium,
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
-        modifier = modifier,
+        modifier = modifier
+            .clip(RoundedCornerShape(8.dp))
+            .background(Color(0xFF97171C))
+            .border(1.dp, Color(0x66FFD889), RoundedCornerShape(8.dp))
+            .padding(horizontal = 12.dp, vertical = 8.dp),
     )
 }
 
@@ -345,7 +493,7 @@ private fun DialogActionButton(
             .padding(horizontal = 16.dp),
         contentAlignment = Alignment.Center,
     ) {
-        Text(text, color = if (text == "×") Color(0xFF777777) else Color.White, fontSize = 17.sp, fontWeight = FontWeight.Medium)
+        Text(text, color = if (text == "×") Color(0xFFB51F24) else Color.White, fontSize = 17.sp, fontWeight = FontWeight.Medium)
     }
 }
 

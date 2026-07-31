@@ -43,6 +43,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
@@ -86,6 +87,8 @@ private const val DEFAULT_HOME_VIDEO_URL = "https://imgcdn.scdjw.com.cn/video/d2
 private const val PARTY_PIONEER_MOBILE_URL = "https://12371.people.com.cn/"
 private const val PARTY_MEMBER_LEARNING_URL = "https://www.scycjy.gov.cn/dyxx_mys.html"
 private const val KANGBA_PARTY_FLAG_URL = "https://www.xyxf.gov.cn/#/index/subordinate/kbdqh"
+private const val CADRE_APPOINTMENT_URL =
+    "https://www.xyxf.gov.cn/#/index/details?id=2076661290549506050&name=%E5%B9%B2%E9%83%A8%E4%BB%BB%E5%85%8D%E5%85%AC%E7%A4%BA"
 
 private val Gold = Color(0xFFFFD889)
 private val BrightGold = Color(0xFFFFD186)
@@ -127,6 +130,7 @@ private val cadreTasks = listOf(
 @Composable
 internal fun HomeScreen(
     modifier: Modifier = Modifier,
+    active: Boolean = true,
     videoUrl: String = DEFAULT_HOME_VIDEO_URL,
     partyStats: List<PartyStat> = defaultPartyStats,
     contentFocusRequester: FocusRequester? = null,
@@ -142,6 +146,7 @@ internal fun HomeScreen(
 
     Box(
         modifier = modifier
+            .alpha(if (active) 1f else 0f)
             .fillMaxSize()
             .focusProperties {
                 onExit = {
@@ -168,6 +173,7 @@ internal fun HomeScreen(
                     .height(36.dp),
                 firstItemFocusRequester = contentFocusRequester,
                 firstItemDownFocusRequester = videoControlFocusRequester,
+                onOpenUrl = { url -> webViewDialogUrl = url },
             )
 
             Row(
@@ -177,6 +183,7 @@ internal fun HomeScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 HomeVideoPlayer(
+                    active = active,
                     videoUrl = videoUrl,
                     playFocusRequester = videoControlFocusRequester,
                     fullscreenFocusRequester = fullscreenFocusRequester,
@@ -191,6 +198,7 @@ internal fun HomeScreen(
                     topFocusRequester = contentFocusRequester,
                     firstItemFocusRequester = firstPartyBuildingFocusRequester,
                     onPartyBuildingClick = onPartyBuildingClick,
+                    onCadreClick = { webViewDialogUrl = CADRE_APPOINTMENT_URL },
                     modifier = Modifier
                         .weight(1.08f)
                         .fillMaxHeight(),
@@ -324,6 +332,7 @@ private fun NewsTicker(
     modifier: Modifier = Modifier,
     firstItemFocusRequester: FocusRequester? = null,
     firstItemDownFocusRequester: FocusRequester? = null,
+    onOpenUrl: (String) -> Unit = {},
 ) {
     Box(
         modifier = modifier
@@ -345,15 +354,36 @@ private fun NewsTicker(
             SpeakerIcon(Modifier.size(24.dp))
             Spacer(Modifier.width(12.dp))
             TickerItem(
-                text = "关于组织开展2024年度党员教育培训工作",
+                text = "丹巴县：依托教育人才“组团式”帮扶推动高中教育提质增效",
+                onClick = {
+                    onOpenUrl(
+                        "https://www.xyxf.gov.cn/#/index/details?id=2080461005451776002&name=%E5%B7%A5%E4%BD%9C%E5%8A%A8%E6%80%81",
+                    )
+                },
                 modifier = Modifier.weight(1f),
                 focusRequester = firstItemFocusRequester,
                 downFocusRequester = firstItemDownFocusRequester,
             )
             TickerDivider()
-            TickerItem("雅江县：“三维赋能”让党员教育在高原落地生根", Modifier.weight(1.2f))
+            TickerItem(
+                text = "九龙县：“三线共进”推动流动党员经常性教育管理提质增效",
+                modifier = Modifier.weight(1.2f),
+                onClick = {
+                    onOpenUrl(
+                        "https://www.xyxf.gov.cn/#/index/details?id=2080460616023232513&name=%E5%B7%A5%E4%BD%9C%E5%8A%A8%E6%80%81",
+                    )
+                },
+            )
             TickerDivider()
-            TickerItem("康定市：建强农业实用人才队伍……", Modifier.weight(0.82f))
+            TickerItem(
+                text = "道孚县：党建之花开出振兴硕果",
+                modifier = Modifier.weight(0.82f),
+                onClick = {
+                    onOpenUrl(
+                        "https://www.xyxf.gov.cn/#/index/details?id=2080459428695461890&name=%E5%B7%A5%E4%BD%9C%E5%8A%A8%E6%80%81",
+                    )
+                },
+            )
         }
     }
 }
@@ -364,6 +394,7 @@ private fun TickerItem(
     modifier: Modifier = Modifier,
     focusRequester: FocusRequester? = null,
     downFocusRequester: FocusRequester? = null,
+    onClick: () -> Unit = {},
 ) {
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(4.dp)
@@ -380,7 +411,7 @@ private fun TickerItem(
                     Modifier
                 },
             )
-            .focusable()
+            .clickable(onClick = onClick)
             .padding(horizontal = 12.dp, vertical = 4.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
@@ -425,6 +456,7 @@ private fun SpeakerIcon(modifier: Modifier = Modifier) {
 
 @Composable
 private fun HomeVideoPlayer(
+    active: Boolean,
     videoUrl: String,
     playFocusRequester: FocusRequester? = null,
     fullscreenFocusRequester: FocusRequester? = null,
@@ -444,6 +476,7 @@ private fun HomeVideoPlayer(
             StaticVideoControls(Modifier.align(Alignment.BottomCenter))
         } else {
             RuntimeVideoPlayer(
+                active = active,
                 videoUrl = videoUrl,
                 playFocusRequester = playFocusRequester,
                 fullscreenFocusRequester = fullscreenFocusRequester,
@@ -466,6 +499,7 @@ private fun HomeVideoPlayer(
 
 @Composable
 private fun RuntimeVideoPlayer(
+    active: Boolean,
     videoUrl: String,
     playFocusRequester: FocusRequester?,
     fullscreenFocusRequester: FocusRequester?,
@@ -478,6 +512,14 @@ private fun RuntimeVideoPlayer(
         title = "康巴党旗红",
         autoPlay = true,
     )
+    LaunchedEffect(controller, active) {
+        controller.setStartAfterPrepared(active)
+        if (active) {
+            controller.resume()
+        } else {
+            controller.pause()
+        }
+    }
     // GSY 已在应用入口切换到 Exo2/Media3 内核。对 HLS 地址再显式声明格式，
     // 可避免带 query 参数的 m3u8 链接被错误按普通媒体源解析。
     LaunchedEffect(controller, videoUrl) {
@@ -811,6 +853,7 @@ private fun PartyWorkPanel(
     topFocusRequester: FocusRequester?,
     firstItemFocusRequester: FocusRequester,
     onPartyBuildingClick: (Int) -> Unit,
+    onCadreClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val sectionHorizontalPadding = 4.dp
@@ -858,6 +901,7 @@ private fun PartyWorkPanel(
                     modifier = Modifier
                         .fillMaxWidth()
                         .focusProperties { left = videoControlFocusRequester },
+                    onClick = onCadreClick,
                 ) {
                     Row(
                         modifier = Modifier
@@ -1061,7 +1105,7 @@ private fun FeatureCard(
         Image(
             painter = painterResource(image),
             contentScale = ContentScale.FillBounds,
-            modifier = Modifier.height(65.dp),
+            modifier = Modifier.height(65.dp).fillMaxWidth(),
             contentDescription = null,
         )
     }

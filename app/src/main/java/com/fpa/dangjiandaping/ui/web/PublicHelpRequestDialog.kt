@@ -68,6 +68,15 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URL
 
+private val HelpDialogRed = Color(0xFF9F101B)
+private val HelpDialogDeepRed = Color(0xFF620810)
+private val HelpDialogCardRed = Color(0xB37A0D16)
+private val HelpDialogGold = Color(0xFFFFD27A)
+private val HelpDialogLightGold = Color(0xFFFFE7B2)
+private val HelpDialogWarmWhite = Color(0xFFFFF7ED)
+private val HelpDialogMutedText = Color(0xFFFFDAD2)
+private val HelpDialogGoldBorder = Color(0x99FFD27A)
+
 internal data class PublicHelpRequest(
     val id: String,
     val title: String,
@@ -81,6 +90,79 @@ internal data class PublicHelpRequest(
     val phone: String,
     val otherContact: String,
     val submittedAt: String,
+)
+
+internal val mockPublicHelpRequests = listOf(
+    PublicHelpRequest(
+        id = "mock-help-medical",
+        title = "群众紧急求助",
+        urgency = "紧急",
+        location = "康定市炉城街道榆林社区",
+        content = "家中老人突发胸痛并伴有呼吸困难，家属暂时无法联系到车辆，希望党员服务队协助联系急救并引导送医。",
+        attachments = emptyList(),
+        serviceType = "紧急救治",
+        serviceTeam = "炉城街道党员志愿服务队",
+        requesterName = "张女士",
+        phone = "138 1234 5678",
+        otherContact = "可电话联系",
+        submittedAt = "2026-07-30 09:18:26",
+    ),
+    PublicHelpRequest(
+        id = "mock-help-supplies",
+        title = "生活物资求助",
+        urgency = "较急",
+        location = "泸定县冷碛镇杵坭村",
+        content = "近期连续降雨导致道路通行不便，独居老人家中常用药和生活物资即将用完，希望协助代购并送达。",
+        attachments = emptyList(),
+        serviceType = "物资代办",
+        serviceTeam = "杵坭村党员服务队",
+        requesterName = "李大爷",
+        phone = "139 8765 4321",
+        otherContact = "由村网格员转达",
+        submittedAt = "2026-07-30 10:06:42",
+    ),
+    PublicHelpRequest(
+        id = "mock-help-road",
+        title = "道路通行求助",
+        urgency = "紧急",
+        location = "雅江县河口镇本达宗村",
+        content = "村口道路出现落石，接送学生的车辆无法通行，希望尽快联系人员设置警示并协助清理道路。",
+        attachments = emptyList(),
+        serviceType = "应急处置",
+        serviceTeam = "河口镇应急党员突击队",
+        requesterName = "曲先生",
+        phone = "136 2468 1357",
+        otherContact = "村民微信群",
+        submittedAt = "2026-07-30 11:27:08",
+    ),
+    PublicHelpRequest(
+        id = "mock-help-repair",
+        title = "设施维修求助",
+        urgency = "一般",
+        location = "丹巴县章谷镇三岔河社区",
+        content = "单元楼公共照明损坏，夜间老人和儿童上下楼存在安全隐患，希望协调维修人员尽快处理。",
+        attachments = emptyList(),
+        serviceType = "设施维修",
+        serviceTeam = "三岔河社区党员服务队",
+        requesterName = "王女士",
+        phone = "135 1122 3344",
+        otherContact = "社区服务群",
+        submittedAt = "2026-07-30 13:45:19",
+    ),
+    PublicHelpRequest(
+        id = "mock-help-transport",
+        title = "出行接送求助",
+        urgency = "较急",
+        location = "炉霍县新都镇昌龙村",
+        content = "行动不便群众明早需要前往县医院复诊，目前没有合适交通工具，希望帮助协调接送车辆。",
+        attachments = emptyList(),
+        serviceType = "爱心接送",
+        serviceTeam = "昌龙村党员志愿服务队",
+        requesterName = "泽仁先生",
+        phone = "137 5566 7788",
+        otherContact = "可联系村干部",
+        submittedAt = "2026-07-30 15:12:37",
+    ),
 )
 
 /**
@@ -248,11 +330,11 @@ private fun PublicHelpRequestDialogContent(
                 .clip(panelShape)
                 .background(
                     Brush.radialGradient(
-                        colors = listOf(Color(0xFF35131D), Color(0xFF081426)),
+                        colors = listOf(HelpDialogRed, HelpDialogDeepRed),
                         radius = 900f,
                     ),
                 )
-                .border(1.dp, Color(0xFF35425A), panelShape)
+                .border(1.dp, HelpDialogGoldBorder, panelShape)
                 .padding(horizontal = 28.dp, vertical = 20.dp),
         ) {
             HelpDialogHeader(
@@ -264,7 +346,7 @@ private fun PublicHelpRequestDialogContent(
             Spacer(Modifier.height(12.dp))
             Text(
                 text = "有群众向您所辖党员服务队提交了帮助申请，请及时联系处置。",
-                color = Color(0xFFF1F3FA),
+                color = HelpDialogWarmWhite,
                 fontSize = 18.sp,
             )
             Spacer(Modifier.height(18.dp))
@@ -297,8 +379,8 @@ private fun PublicHelpRequestDialogContent(
             ) {
                 HelpActionButton(
                     text = "✓  已联系处置",
-                    focusedColor = Color(0xFFC91628),
-                    normalColor = Color(0xFF8D0E1B),
+                    focusedColor = Color(0xFFE33A3F),
+                    normalColor = Color(0xFFB51F2B),
                     onClick = onHandled,
                     modifier = Modifier
                         .weight(1f)
@@ -310,8 +392,8 @@ private fun PublicHelpRequestDialogContent(
                 )
                 HelpActionButton(
                     text = "◷  稍后联系",
-                    focusedColor = Color(0xFF263953),
-                    normalColor = Color(0xFF111F34),
+                    focusedColor = Color(0xFFB92B32),
+                    normalColor = Color(0xFF741019),
                     onClick = onContactLater,
                     modifier = Modifier
                         .weight(1f)
@@ -325,7 +407,7 @@ private fun PublicHelpRequestDialogContent(
             Spacer(Modifier.height(10.dp))
             Text(
                 text = "温馨提示：请尽快与群众取得联系并提供帮助，感谢您的付出！",
-                color = Color(0xFF8490A4),
+                color = HelpDialogMutedText,
                 fontSize = 14.sp,
                 modifier = Modifier.align(Alignment.CenterHorizontally),
             )
@@ -376,7 +458,7 @@ private fun HelpDialogHeader(
 //        }
         HelpActionButton(
             text = "×",
-            focusedColor = Color(0xFF3A465A),
+            focusedColor = Color(0xFFC52A34),
             normalColor = Color.Transparent,
             onClick = onDismiss,
             compact = true,
@@ -391,12 +473,12 @@ private fun HelpDialogHeader(
 private fun HelpBadge(text: String) {
     Text(
         text = text,
-        color = Color(0xFFFFD7DA),
+        color = Color(0xFF8A0C16),
         fontSize = 15.sp,
         fontWeight = FontWeight.Bold,
         modifier = Modifier
             .clip(RoundedCornerShape(6.dp))
-            .background(Color(0xFF9F1422))
+            .background(HelpDialogGold)
             .padding(horizontal = 12.dp, vertical = 6.dp),
     )
 }
@@ -419,7 +501,7 @@ private fun HelpRequestLeftColumn(
             .clip(shape)
             .border(
                 width = if (focused) 2.dp else 0.dp,
-                color = Color(0xFFFFD27A),
+                color = HelpDialogGold,
                 shape = shape,
             )
             .onFocusChanged { focused = it.isFocused }
@@ -466,20 +548,20 @@ private fun HelpRequestLeftColumn(
         HelpSectionTitle("群众位置")
         Text(
             text = request.location.ifBlank { "未提供位置信息" },
-            color = Color(0xFFE7EBF4),
+            color = HelpDialogWarmWhite,
             fontSize = 16.sp,
             lineHeight = 23.sp,
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(7.dp))
-                .background(Color(0x731A273A))
-                .border(1.dp, Color(0xFF2A3B54), RoundedCornerShape(7.dp))
+                .background(HelpDialogCardRed)
+                .border(1.dp, HelpDialogGoldBorder, RoundedCornerShape(7.dp))
                 .padding(horizontal = 14.dp, vertical = 11.dp),
         )
         HelpSectionTitle("求助内容")
         Text(
             text = request.content.ifBlank { "未提供求助内容" },
-            color = Color(0xFFD7DEEA),
+            color = HelpDialogMutedText,
             fontSize = 15.sp,
             lineHeight = 22.sp,
             maxLines = 4,
@@ -487,7 +569,8 @@ private fun HelpRequestLeftColumn(
             modifier = Modifier
                 .fillMaxWidth()
                 .clip(RoundedCornerShape(7.dp))
-                .background(Color(0x731A273A))
+                .background(HelpDialogCardRed)
+                .border(1.dp, HelpDialogGoldBorder, RoundedCornerShape(7.dp))
                 .padding(14.dp),
         )
         if (request.attachments.isNotEmpty()) {
@@ -515,8 +598,8 @@ private fun HelpRequestDetails(request: PublicHelpRequest, modifier: Modifier = 
     Column(
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(Color(0x73111E31))
-            .border(1.dp, Color(0xFF263650), RoundedCornerShape(8.dp))
+            .background(HelpDialogCardRed)
+            .border(1.dp, HelpDialogGoldBorder, RoundedCornerShape(8.dp))
             .padding(horizontal = 20.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.SpaceEvenly,
     ) {
@@ -536,11 +619,11 @@ private fun HelpDetailRow(icon: String, label: String, value: String) {
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text(icon, color = Color(0xFFD7DDE9), fontSize = 19.sp, modifier = Modifier.width(22.dp))
-        Text(label, color = Color(0xFFD7DDE9), fontSize = 16.sp, modifier = Modifier.width(126.dp))
+        Text(icon, color = HelpDialogGold, fontSize = 19.sp, modifier = Modifier.width(22.dp))
+        Text(label, color = HelpDialogLightGold, fontSize = 16.sp, modifier = Modifier.width(126.dp))
         Text(
             text = value.ifBlank { "未提供" },
-            color = Color(0xFFF1F4FA),
+            color = HelpDialogWarmWhite,
             fontSize = 16.sp,
             maxLines = 2,
             overflow = TextOverflow.Ellipsis,
@@ -551,7 +634,7 @@ private fun HelpDetailRow(icon: String, label: String, value: String) {
 
 @Composable
 private fun HelpSectionTitle(title: String) {
-    Text(title, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+    Text(title, color = HelpDialogLightGold, fontSize = 17.sp, fontWeight = FontWeight.Bold)
 }
 
 @Composable
@@ -583,7 +666,7 @@ private fun HelpActionButton(
             .background(if (focused) focusedColor else normalColor)
             .border(
                 width = if (focused) 2.dp else 1.dp,
-                color = if (focused) Color(0xFFFFD27A) else Color(0xFF33415A),
+                color = if (focused) HelpDialogGold else HelpDialogGoldBorder,
                 shape = shape,
             )
             .focusRequester(clickFocusRequester)
@@ -619,10 +702,12 @@ private fun HelpRemoteImage(url: String, modifier: Modifier = Modifier) {
     }
     if (bitmap == null) {
         Box(
-            modifier = modifier.background(Color(0xFF243147)),
+            modifier = modifier
+                .background(Color(0xFF76121A))
+                .border(1.dp, HelpDialogGoldBorder, RoundedCornerShape(7.dp)),
             contentAlignment = Alignment.Center,
         ) {
-            Text("图片", color = Color(0xFF9DA8B9), fontSize = 14.sp)
+            Text("图片", color = HelpDialogLightGold, fontSize = 14.sp)
         }
     } else {
         Image(
