@@ -36,6 +36,7 @@ import androidx.compose.ui.focus.focusRestorer
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -193,7 +194,9 @@ private fun HeaderTabRow(
                     text = tab.title,
                     recommended = tab.recommended,
                     focused = focused,
-                    retainedFocus = retainedFocus
+                    retainedFocus = retainedFocus,
+                    isFirst = index == 0,
+                    isLast = index == TV_TABS.lastIndex,
                 )
             }
         }
@@ -217,7 +220,9 @@ private fun TvTabContent(
     text: String,
     recommended: Boolean,
     focused: Boolean,
-    retainedFocus: Boolean
+    retainedFocus: Boolean,
+    isFirst: Boolean,
+    isLast: Boolean,
 ) {
     val emphasized = focused || retainedFocus
 //    val tabScale by animateFloatAsState(
@@ -231,6 +236,8 @@ private fun TvTabContent(
             text = text,
             emphasized = emphasized,
             focused = focused,
+            isFirst = isFirst,
+            isLast = isLast,
         )
 
         if (emphasized) {
@@ -259,7 +266,13 @@ private fun TvTabContent(
 }
 
 @Composable
-private fun StableTabLabel(text: String, emphasized: Boolean, focused: Boolean) {
+private fun StableTabLabel(
+    text: String,
+    emphasized: Boolean,
+    focused: Boolean,
+    isFirst: Boolean,
+    isLast: Boolean,
+) {
     Layout(
         content = {
             // The normal label determines horizontal placement for every tab.
@@ -279,7 +292,6 @@ private fun StableTabLabel(text: String, emphasized: Boolean, focused: Boolean) 
                 fontStyle = FontStyle.Italic,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
-                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
             )
             Text(
                 text = text,
@@ -294,6 +306,12 @@ private fun StableTabLabel(text: String, emphasized: Boolean, focused: Boolean) 
                     val scale = if (emphasized) 22f / 16f else 1f
                     scaleX = scale
                     scaleY = scale
+                    transformOrigin = when {
+                        isFirst -> TransformOrigin(0f, 0.5f)
+                        isLast -> TransformOrigin(1f, 0.5f)
+                        else -> TransformOrigin.Center
+                    }
+                    clip = false
                 }
                     .then(
                         if (focused) {
@@ -301,25 +319,28 @@ private fun StableTabLabel(text: String, emphasized: Boolean, focused: Boolean) 
                                 width = 2.dp,
                                 color = Color(0xFFFFD186),
                                 shape = RoundedCornerShape(5.dp),
-                            )
+                            ).padding(horizontal = 5.dp, vertical = 2.dp)
                         } else {
                             Modifier
                         },
-                    )
-                    .padding(horizontal = 5.dp, vertical = 2.dp),
+                    ),
             )
         },
     ) { measurables, constraints ->
         val normal = measurables[0].measure(constraints)
         val maximum = measurables[1].measure(constraints)
         val current = measurables[2].measure(constraints)
-        val width = maximum.width
         val height = maximum.height
+        val currentX = when {
+            isFirst -> 0
+            isLast -> normal.width - current.width
+            else -> (normal.width - current.width) / 2
+        }
 
-        layout(width, height) {
-            normal.placeRelative((width - normal.width) / 2, (height - normal.height) / 2)
+        layout(normal.width, height) {
+            normal.placeRelative(0, (height - normal.height) / 2)
             maximum.placeRelative(0, 0)
-            current.placeRelative((width - current.width) / 2, (height - current.height) / 2)
+            current.placeRelative(currentX, (height - current.height) / 2)
         }
     }
 }
