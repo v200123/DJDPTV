@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.Text
+import com.fpa.dangjiandaping.ui.focus.focusOnClick
 import androidx.tv.material3.MaterialTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -486,6 +487,7 @@ private fun DialogActionButton(
             .background(color)
             .border(if (focused) 2.dp else 0.dp, Color(0xFFFFD889), shape)
             .focusRequester(clickFocusRequester)
+            .focusOnClick(clickFocusRequester)
             .clickable {
                 clickFocusRequester.requestFocus()
                 onClick()

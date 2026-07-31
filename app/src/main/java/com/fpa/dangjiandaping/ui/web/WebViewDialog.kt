@@ -41,6 +41,7 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.Text
+import com.fpa.dangjiandaping.ui.focus.focusOnClick
 
 private const val DESKTOP_USER_AGENT =
     "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 " +
@@ -90,9 +91,11 @@ internal fun WebViewDialog(
                 ) {
                     WebViewDialogCloseButton(
                         onClick = onDismiss,
+                        focusRequester = closeFocusRequester,
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
-                            .focusRequester(closeFocusRequester),
+                            .focusRequester(closeFocusRequester)
+                            .focusOnClick(closeFocusRequester),
                     )
                 }
 
@@ -159,6 +162,7 @@ internal fun WebViewDialog(
 @Composable
 private fun WebViewDialogCloseButton(
     onClick: () -> Unit,
+    focusRequester: FocusRequester,
     modifier: Modifier = Modifier,
 ) {
     var focused by remember { mutableStateOf(false) }
@@ -179,7 +183,10 @@ private fun WebViewDialogCloseButton(
                 },
             )
             .onFocusChanged { focused = it.isFocused }
-            .clickable(onClick = onClick)
+            .clickable {
+                focusRequester.requestFocus()
+                onClick()
+            }
             .focusable(),
         contentAlignment = Alignment.Center,
     ) {

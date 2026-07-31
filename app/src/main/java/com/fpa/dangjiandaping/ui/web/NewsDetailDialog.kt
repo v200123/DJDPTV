@@ -50,6 +50,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.fpa.dangjiandaping.ui.focus.focusOnClick
 import kotlinx.coroutines.delay
 import org.json.JSONArray
 import org.json.JSONObject
@@ -440,6 +441,7 @@ private fun TvActionButton(
                 shape = shape
             )
             .focusRequester(clickFocusRequester)
+            .focusOnClick(clickFocusRequester)
             .clickable(enabled = enabled) {
                 clickFocusRequester.requestFocus()
                 onClick()

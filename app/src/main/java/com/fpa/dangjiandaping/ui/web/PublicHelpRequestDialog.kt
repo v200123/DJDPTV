@@ -61,6 +61,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.fpa.dangjiandaping.ui.focus.focusOnClick
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -670,6 +671,7 @@ private fun HelpActionButton(
                 shape = shape,
             )
             .focusRequester(clickFocusRequester)
+            .focusOnClick(clickFocusRequester)
             .clickable(role = Role.Button) {
                 clickFocusRequester.requestFocus()
                 onClick()

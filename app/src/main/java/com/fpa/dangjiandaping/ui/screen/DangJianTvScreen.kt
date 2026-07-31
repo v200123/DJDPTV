@@ -47,6 +47,7 @@ import androidx.navigationevent.compose.rememberNavigationEventDispatcherOwner
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.tv.material3.MaterialTheme
 import com.fpa.dangjiandaping.R
+import com.fpa.dangjiandaping.ui.MainContentHorizontalPadding
 import com.fpa.dangjiandaping.ui.header.NativeHeader
 import com.fpa.dangjiandaping.ui.header.rememberTvTabFocusRequesters
 import com.fpa.dangjiandaping.ui.home.HomeScreen
@@ -281,6 +282,7 @@ fun DangJianTvScreen(
                 onTabDown = { tabIndex -> activateTab(tabIndex, moveFocusToContent = true) },
                 modifier = Modifier
                     .fillMaxWidth()
+                    .padding(horizontal = MainContentHorizontalPadding)
                     .onFocusChanged { headerHasFocus = it.hasFocus },
             )
             Spacer(modifier = Modifier.height(6.dp))
@@ -288,6 +290,7 @@ fun DangJianTvScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
+                    .padding(horizontal = MainContentHorizontalPadding)
                     .clipToBounds(),
             ) {
                 val homeIsActive = currentRoute == HomeRoute
@@ -330,7 +333,10 @@ fun DangJianTvScreen(
                             },
                             modifier = Modifier
                                 .fillMaxSize()
-                                .padding(50.dp,8.dp,50.dp, 10.dp)
+                                .padding(
+                                    top = 8.dp,
+                                    bottom = 10.dp,
+                                )
                                 .zIndex(if (webIsActive) 1f else 0f),
                         )
                     }

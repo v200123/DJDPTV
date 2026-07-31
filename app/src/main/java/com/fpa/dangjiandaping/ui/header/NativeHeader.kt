@@ -55,6 +55,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.fpa.dangjiandaping.R
+import com.fpa.dangjiandaping.ui.focus.focusOnClick
 import com.fpa.dangjiandaping.ui.navigation.TV_TABS
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -82,7 +83,6 @@ fun NativeHeader(
         HeaderBrandRow(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 28.dp)
         )
         HeaderDivider()
         HeaderTabRow(
@@ -104,6 +104,8 @@ private fun HeaderBrandRow(modifier: Modifier = Modifier) {
         modifier = modifier,
         contentAlignment = Alignment.TopEnd
     ) {
+        Image(painterResource(R.drawable.ic_app_left_logo), contentScale = ContentScale.Fit, contentDescription = "",
+            modifier = Modifier.align(Alignment.TopStart))
         Column(horizontalAlignment = Alignment.End, modifier = Modifier.offset(0.dp,10.dp)) {
             Text("中共甘孜州委组织部", color = Color(0xFFFFD186), fontSize = 12.sp)
             Text(currentDateText(), color = Color(0xFFFFD186), fontSize = 10.sp)
@@ -116,7 +118,7 @@ private fun HeaderDivider() {
     Spacer(
         Modifier
             .fillMaxWidth()
-            .height(36.dp)
+            .height(6.dp)
     )
 }
 
@@ -134,7 +136,6 @@ private fun HeaderTabRow(
 
     Row(
         modifier = modifier
-            .padding(51.dp,0.dp)
             .focusRestorer()
             .onFocusChanged { tabRowHasFocus = it.hasFocus },
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -146,6 +147,7 @@ private fun HeaderTabRow(
             Box(
                 modifier = Modifier
                     .focusRequester(tabFocusRequesters[index])
+                    .focusOnClick(tabFocusRequesters[index])
                     .focusProperties {
                         up = FocusRequester.Cancel
                         if (index == 0) {
@@ -277,6 +279,7 @@ private fun StableTabLabel(text: String, emphasized: Boolean, focused: Boolean) 
                 fontStyle = FontStyle.Italic,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
+                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
             )
             Text(
                 text = text,
@@ -310,12 +313,13 @@ private fun StableTabLabel(text: String, emphasized: Boolean, focused: Boolean) 
         val normal = measurables[0].measure(constraints)
         val maximum = measurables[1].measure(constraints)
         val current = measurables[2].measure(constraints)
+        val width = maximum.width
         val height = maximum.height
 
-        layout(normal.width, height) {
-            normal.placeRelative(0, (height - normal.height) / 2)
+        layout(width, height) {
+            normal.placeRelative((width - normal.width) / 2, (height - normal.height) / 2)
             maximum.placeRelative(0, 0)
-            current.placeRelative(0, (height - current.height) / 2)
+            current.placeRelative((width - current.width) / 2, (height - current.height) / 2)
         }
     }
 }

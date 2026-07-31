@@ -65,6 +65,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.fpa.dangjiandaping.ui.focus.focusOnClick
 import com.shuyu.gsyvideoplayer.compose.native_.GSYPlayState
 import com.shuyu.gsyvideoplayer.compose.native_.GSYPlayerSurface
 import com.shuyu.gsyvideoplayer.compose.native_.rememberGSYPlayerController
@@ -286,6 +287,7 @@ private fun PlayerControlButton(
     Box(
         modifier = Modifier
             .focusRequester(focusRequester)
+            .focusOnClick(focusRequester)
             .focusProperties {
                 rightFocusRequester?.let { right = it }
                 downFocusRequester?.let { down = it }
@@ -299,7 +301,10 @@ private fun PlayerControlButton(
                 color = if (focused) Color(0xFFFFD889) else Color(0x80FFFFFF),
                 shape = shape,
             )
-            .clickable(onClick = onClick)
+            .clickable {
+                focusRequester.requestFocus()
+                onClick()
+            }
             .padding(horizontal = 24.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
@@ -331,6 +336,7 @@ private fun TvSeekBar(
     Column(
         modifier = modifier
             .focusRequester(focusRequester)
+            .focusOnClick(focusRequester)
             .focusProperties {
                 left = leftFocusRequester
                 up = upFocusRequester
@@ -363,6 +369,7 @@ private fun TvSeekBar(
             .focusable()
             .pointerInput(duration) {
                 detectTapGestures { offset ->
+                    focusRequester.requestFocus()
                     if (duration > 0L) {
                         onSeekTo((duration * (offset.x / size.width).coerceIn(0f, 1f)).toLong())
                     }

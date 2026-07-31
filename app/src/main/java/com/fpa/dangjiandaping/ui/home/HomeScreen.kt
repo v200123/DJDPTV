@@ -73,6 +73,7 @@ import androidx.compose.ui.zIndex
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.fpa.dangjiandaping.R
+import com.fpa.dangjiandaping.ui.focus.focusOnClick
 import com.fpa.dangjiandaping.ui.web.WebViewDialog
 import com.shuyu.gsyvideoplayer.compose.native_.GSYPlayState
 import com.shuyu.gsyvideoplayer.compose.native_.GSYPlayerSurface
@@ -164,7 +165,10 @@ internal fun HomeScreen(
         Column(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(51.dp,8.dp,51.dp,10.dp),
+                .padding(
+                    top = 8.dp,
+                    bottom = 10.dp,
+                ),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
             NewsTicker(
@@ -397,13 +401,16 @@ private fun TickerItem(
     onClick: () -> Unit = {},
 ) {
     var focused by remember { mutableStateOf(false) }
+    val defaultFocusRequester = remember { FocusRequester() }
+    val clickFocusRequester = focusRequester ?: defaultFocusRequester
     val shape = RoundedCornerShape(4.dp)
     Box(
         modifier = modifier
             .clip(shape)
             .then(if (focused) Modifier.border(1.dp, PrimaryRed, shape) else Modifier)
             .onFocusChanged { focused = it.isFocused }
-            .then(if (focusRequester != null) Modifier.focusRequester(focusRequester) else Modifier)
+            .focusRequester(clickFocusRequester)
+            .focusOnClick(clickFocusRequester)
             .then(
                 if (downFocusRequester != null) {
                     Modifier.focusProperties { down = downFocusRequester }
@@ -411,7 +418,10 @@ private fun TickerItem(
                     Modifier
                 },
             )
-            .clickable(onClick = onClick)
+            .clickable {
+                clickFocusRequester.requestFocus()
+                onClick()
+            }
             .padding(horizontal = 12.dp, vertical = 4.dp),
         contentAlignment = Alignment.CenterStart,
     ) {
@@ -739,6 +749,7 @@ private fun SeekBar(
         modifier = modifier
             .height(24.dp)
             .focusRequester(clickFocusRequester)
+            .focusOnClick(clickFocusRequester)
             .pointerInput(clickFocusRequester) {
                 detectTapGestures(
                     onPress = { offset ->
@@ -835,6 +846,7 @@ private fun FocusableAction(
             .then(if (focused) Modifier.border(2.dp, Gold, shape) else Modifier)
             .onFocusChanged { focused = it.isFocused }
             .focusRequester(clickFocusRequester)
+            .focusOnClick(clickFocusRequester)
             .clickable {
                 clickFocusRequester.requestFocus()
                 onClick()
@@ -1045,6 +1057,7 @@ private fun PartyPanelFocusableItem(
             .then(if (focused) Modifier.border(2.dp, Gold, shape) else Modifier)
             .onFocusChanged { focused = it.isFocused }
             .focusRequester(clickFocusRequester)
+            .focusOnClick(clickFocusRequester)
             .clickable {
                 clickFocusRequester.requestFocus()
                 onClick()
@@ -1236,6 +1249,7 @@ private fun FocusableTile(
             .then(if (focused) Modifier.border(3.dp, BrightGold, RoundedCornerShape(8.dp)) else Modifier)
             .onFocusChanged { focused = it.isFocused }
             .focusRequester(clickFocusRequester)
+            .focusOnClick(clickFocusRequester)
             .clickable {
                 clickFocusRequester.requestFocus()
                 onClick()
