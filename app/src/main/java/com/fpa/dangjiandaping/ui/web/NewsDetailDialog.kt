@@ -7,6 +7,7 @@ import android.os.Build
 import android.text.Html
 import android.text.method.ScrollingMovementMethod
 import android.view.KeyEvent
+import android.view.View
 import android.widget.TextView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -254,6 +255,7 @@ private fun NewsDetailDialogContent(
 
             NewsHtmlContent(
                 html = news.content,
+                onNavigateUp = closeFocusRequester::requestFocus,
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
@@ -462,6 +464,7 @@ private fun TvActionButton(
 @Composable
 private fun NewsHtmlContent(
     html: String,
+    onNavigateUp: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     if (LocalInspectionMode.current) {
@@ -480,6 +483,8 @@ private fun NewsHtmlContent(
         modifier = modifier,
         factory = { context ->
             TextView(context).apply {
+                val scrollStepPx = (72 * resources.displayMetrics.density).toInt()
+
                 setTextColor(textColor)
                 textSize = 18f
                 setLineSpacing(8f, 1.25f)
@@ -488,18 +493,39 @@ private fun NewsHtmlContent(
                 isFocusable = true
                 isFocusableInTouchMode = true
                 isVerticalScrollBarEnabled = true
+                overScrollMode = View.OVER_SCROLL_NEVER
                 setOnKeyListener { _, keyCode, event ->
-                    if (event.action != KeyEvent.ACTION_DOWN) {
+                    if (keyCode == KeyEvent.KEYCODE_BACK ||
+                        keyCode == KeyEvent.KEYCODE_ESCAPE
+                    ) {
+                        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+                            onNavigateUp()
+                        }
+                        // Consume both DOWN and UP so Dialog does not dismiss after focus moves.
+                        true
+                    } else if (event.action != KeyEvent.ACTION_DOWN) {
                         false
                     } else {
+                        val contentHeight = layout?.height ?: 0
+                        val viewportHeight =
+                            (height - totalPaddingTop - totalPaddingBottom).coerceAtLeast(0)
+                        val maxScrollY = (contentHeight - viewportHeight).coerceAtLeast(0)
+
                         when (keyCode) {
                             KeyEvent.KEYCODE_DPAD_UP -> {
-                                scrollBy(0, -72)
+                                if (scrollY <= 0) {
+                                    onNavigateUp()
+                                } else {
+                                    scrollTo(0, (scrollY - scrollStepPx).coerceAtLeast(0))
+                                }
                                 true
                             }
 
                             KeyEvent.KEYCODE_DPAD_DOWN -> {
-                                scrollBy(0, 72)
+                                scrollTo(
+                                    0,
+                                    (scrollY + scrollStepPx).coerceAtMost(maxScrollY),
+                                )
                                 true
                             }
 
@@ -517,6 +543,14 @@ private fun NewsHtmlContent(
                 } else {
                     @Suppress("DEPRECATION")
                     Html.fromHtml(html)
+                }
+                textView.post {
+                    val contentHeight = textView.layout?.height ?: 0
+                    val viewportHeight =
+                        (textView.height - textView.totalPaddingTop - textView.totalPaddingBottom)
+                            .coerceAtLeast(0)
+                    val maxScrollY = (contentHeight - viewportHeight).coerceAtLeast(0)
+                    textView.scrollTo(0, textView.scrollY.coerceIn(0, maxScrollY))
                 }
             }
         }

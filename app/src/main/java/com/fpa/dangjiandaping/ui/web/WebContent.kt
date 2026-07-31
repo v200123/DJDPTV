@@ -77,8 +77,10 @@ private class WebFocusBridge(
     fun showNewsDetail(newsJson: String) {
         Log.d(FOCUS_LOG_TAG, "H5 called showNewsDetail,收到的数据为:$newsJson")
         webView.post {
-            webView.clearFocus()
-            onShowNewsDetail(newsJson)
+            webView.evaluateJavascript(CAPTURE_WEB_FOCUS_SCRIPT) {
+                webView.clearFocus()
+                onShowNewsDetail(newsJson)
+            }
         }
     }
 
@@ -161,8 +163,23 @@ internal fun WebContent(
     var newsDetail by remember(url) { mutableStateOf<NewsDetail?>(null) }
     var serviceTeam by remember(url) { mutableStateOf<ServiceTeam?>(null) }
     var webViewDialogUrl by remember(url) { mutableStateOf<String?>(null) }
+    var restoreNewsDetailFocus by remember(url) { mutableStateOf(false) }
     var restoreServiceTeamFocus by remember(url) { mutableStateOf(false) }
     val webViewHolder = remember { arrayOfNulls<WebView>(1) }
+
+    LaunchedEffect(newsDetail, restoreNewsDetailFocus) {
+        if (newsDetail == null && restoreNewsDetailFocus) {
+            webViewHolder[0]?.let { webView ->
+                webView.isFocusable = true
+                webView.isFocusableInTouchMode = true
+                webView.requestFocus()
+                webView.evaluateJavascript(RESTORE_WEB_FOCUS_SCRIPT) { restored ->
+                    Log.d(FOCUS_LOG_TAG, "News detail dialog focus restored=$restored")
+                }
+            }
+            restoreNewsDetailFocus = false
+        }
+    }
 
     LaunchedEffect(serviceTeam, restoreServiceTeamFocus) {
         if (serviceTeam == null && restoreServiceTeamFocus) {
@@ -403,7 +420,10 @@ internal fun WebContent(
         newsDetail?.let { detail ->
             NewsDetailDialog(
                 news = detail,
-                onDismiss = { newsDetail = null }
+                onDismiss = {
+                    newsDetail = null
+                    restoreNewsDetailFocus = true
+                }
             )
         }
 

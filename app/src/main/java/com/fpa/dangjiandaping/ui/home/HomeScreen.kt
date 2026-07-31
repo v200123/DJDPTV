@@ -525,7 +525,9 @@ private fun RuntimeVideoPlayer(
     LaunchedEffect(controller, active) {
         controller.setStartAfterPrepared(active)
         if (active) {
-            controller.resume()
+            // GSY uses one process-wide playback manager. Another screen may have replaced
+            // this host as the current listener, so resume() alone cannot reclaim playback.
+            controller.play()
         } else {
             controller.pause()
         }

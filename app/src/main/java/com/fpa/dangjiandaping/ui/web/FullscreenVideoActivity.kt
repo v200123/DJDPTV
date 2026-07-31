@@ -105,7 +105,7 @@ class FullscreenVideoActivity : ComponentActivity() {
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (keyCode == KeyEvent.KEYCODE_BACK || keyCode == KeyEvent.KEYCODE_ESCAPE) {
-            finish()
+            onBackPressedDispatcher.onBackPressed()
             return true
         }
         return super.onKeyDown(keyCode, event)
@@ -154,6 +154,18 @@ private fun FullscreenVideoPlayer(
     val playFocusRequester = remember { FocusRequester() }
     val seekFocusRequester = remember { FocusRequester() }
     val exitFocusRequester = remember { FocusRequester() }
+    var exiting by remember { mutableStateOf(false) }
+
+    val exitPlayer = {
+        if (!exiting) {
+            exiting = true
+            // Release while GSYPlayerSurface is still attached. Once AndroidView.onRelease
+            // detaches the host, controller disposal can no longer reach this player.
+            controller.setStartAfterPrepared(false)
+            controller.release()
+            onExit()
+        }
+    }
 
     LaunchedEffect(controller, videoUrl) {
         controller.setOverrideExtension(
@@ -182,7 +194,7 @@ private fun FullscreenVideoPlayer(
         playFocusRequester.requestFocus()
     }
 
-    BackHandler(onBack = onExit)
+    BackHandler(onBack = exitPlayer)
 
     Box(
         modifier = Modifier
@@ -220,7 +232,7 @@ private fun FullscreenVideoPlayer(
                 text = "退出",
                 focusRequester = exitFocusRequester,
                 downFocusRequester = playFocusRequester,
-                onClick = onExit,
+                onClick = exitPlayer,
             )
         }
 

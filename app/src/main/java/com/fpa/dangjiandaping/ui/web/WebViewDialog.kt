@@ -126,7 +126,7 @@ internal fun WebViewDialog(
                                 mediaPlaybackRequiresUserGesture = false
                                 mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                                 cacheMode = WebSettings.LOAD_DEFAULT
-                                userAgentString = DESKTOP_USER_AGENT
+//                                userAgentString = DESKTOP_USER_AGENT
                                 useWideViewPort = true
                                 loadWithOverviewMode = true
                                 builtInZoomControls = false
