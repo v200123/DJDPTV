@@ -2,7 +2,9 @@ package com.fpa.dangjiandaping.ui.web
 
 import android.annotation.SuppressLint
 import android.graphics.Color
+import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
@@ -24,9 +26,11 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -35,6 +39,7 @@ import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -42,10 +47,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.Text
 import com.fpa.dangjiandaping.ui.focus.focusOnClick
-
-private const val DESKTOP_USER_AGENT =
-    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 " +
-        "(KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
 
 /**
  * WebView 弹窗。
@@ -59,6 +60,9 @@ internal fun WebViewDialog(
     onDismiss: () -> Unit,
 ) {
     val closeFocusRequester = remember { FocusRequester() }
+    val webViewHolder = remember { arrayOfNulls<WebView>(1) }
+    var pageTitle by remember { mutableStateOf("网页详情") }
+    var closeFocusRequestTrigger by remember { mutableIntStateOf(0) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -89,6 +93,18 @@ internal fun WebViewDialog(
                         .background(ComposeColor(0xFFFAFAFA))
                         .padding(horizontal = 14.dp, vertical = 7.dp),
                 ) {
+                    Text(
+                        text = pageTitle.ifBlank { "网页详情" },
+                        color = ComposeColor(0xFF333333),
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .align(Alignment.CenterStart)
+                            .fillMaxWidth()
+                            .padding(start = 8.dp, end = 94.dp),
+                    )
                     WebViewDialogCloseButton(
                         onClick = onDismiss,
                         focusRequester = closeFocusRequester,
@@ -104,7 +120,45 @@ internal fun WebViewDialog(
                         .fillMaxWidth()
                         .weight(1f),
                     factory = { context ->
-                        WebView(context).apply {
+                        val scrollStepPx =
+                            (72 * context.resources.displayMetrics.density).toInt()
+                        object : WebView(context) {
+                            override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+                                if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP) {
+                                    if (event.action == KeyEvent.ACTION_DOWN &&
+                                        event.repeatCount == 0
+                                    ) {
+                                        val atTop =
+                                            scrollY <= 0 || !canScrollVertically(-1)
+                                        if (atTop) {
+                                            isFocusable = false
+                                            isFocusableInTouchMode = false
+                                            clearFocus()
+                                            closeFocusRequestTrigger++
+                                        } else {
+                                            scrollTo(
+                                                0,
+                                                (scrollY - scrollStepPx).coerceAtLeast(0),
+                                            )
+                                        }
+                                    }
+                                    // Consume DOWN and UP before WebView/HTML handles them.
+                                    return true
+                                }
+                                if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
+                                    if (event.action == KeyEvent.ACTION_DOWN &&
+                                        event.repeatCount == 0 &&
+                                        canScrollVertically(1)
+                                    ) {
+                                        scrollBy(0, scrollStepPx)
+                                    }
+                                    return true
+                                }
+                                return super.dispatchKeyEvent(event)
+                            }
+                        }.apply {
+                            webViewHolder[0] = this
+
                             layoutParams = ViewGroup.LayoutParams(
                                 ViewGroup.LayoutParams.MATCH_PARENT,
                                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -119,31 +173,47 @@ internal fun WebViewDialog(
                                 false
                             }
                             webViewClient = WebViewClient()
-                            webChromeClient = WebChromeClient()
+                            webChromeClient = object : WebChromeClient() {
+                                override fun onReceivedTitle(view: WebView, title: String?) {
+                                    super.onReceivedTitle(view, title)
+                                    pageTitle = title
+                                        ?.trim()
+                                        ?.takeIf(String::isNotEmpty)
+                                        ?: "网页详情"
+                                    view.contentDescription = pageTitle
+                                }
+                            }
                             settings.apply {
                                 javaScriptEnabled = true
                                 domStorageEnabled = true
                                 mediaPlaybackRequiresUserGesture = false
                                 mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                                 cacheMode = WebSettings.LOAD_DEFAULT
-//                                userAgentString = DESKTOP_USER_AGENT
+                                userAgentString = MOBILE_BROWSER_USER_AGENT
                                 useWideViewPort = true
                                 loadWithOverviewMode = true
                                 builtInZoomControls = false
                                 displayZoomControls = false
                                 setSupportZoom(true)
                             }
+                            isVerticalScrollBarEnabled = true
+                            isScrollbarFadingEnabled = false
+                            scrollBarStyle = View.SCROLLBARS_INSIDE_OVERLAY
                             tag = url
                             loadUrl(url)
                         }
                     },
                     update = { webView ->
                         if (webView.tag != url) {
+                            pageTitle = "网页详情"
                             webView.tag = url
                             webView.loadUrl(url)
                         }
                     },
                     onRelease = { webView ->
+                        if (webViewHolder[0] === webView) {
+                            webViewHolder[0] = null
+                        }
                         webView.stopLoading()
                         webView.loadUrl("about:blank")
                         webView.removeAllViews()
@@ -155,7 +225,21 @@ internal fun WebViewDialog(
     }
 
     LaunchedEffect(url) {
+        pageTitle = "网页详情"
         closeFocusRequester.requestFocus()
+    }
+
+    LaunchedEffect(closeFocusRequestTrigger) {
+        if (closeFocusRequestTrigger > 0) {
+            // Let AndroidView finish dispatching DPAD_UP before Compose takes focus back.
+            withFrameNanos { }
+            closeFocusRequester.requestFocus()
+            withFrameNanos { }
+            webViewHolder[0]?.let { webView ->
+                webView.isFocusable = true
+                webView.isFocusableInTouchMode = true
+            }
+        }
     }
 }
 

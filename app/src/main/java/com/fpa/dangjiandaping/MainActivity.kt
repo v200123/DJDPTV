@@ -35,6 +35,7 @@ class MainActivity : ComponentActivity() {
     private var publicHelpRequestTrigger by mutableIntStateOf(0)
     private var specialHelpKeyIndex = 0
     private var lastSpecialHelpKeyTime = 0L
+    private var consumeSpecialHelpKeyUp = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         setTheme(R.style.Theme_DangJianDaPing)
@@ -78,35 +79,46 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
-        if (event.repeatCount == 0) {
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        val normalizedKeyCode = when (event.keyCode) {
+            KeyEvent.KEYCODE_ENTER,
+            KeyEvent.KEYCODE_NUMPAD_ENTER,
+            -> KeyEvent.KEYCODE_DPAD_CENTER
+
+            else -> event.keyCode
+        }
+
+        if (event.action == KeyEvent.ACTION_UP &&
+            normalizedKeyCode == KeyEvent.KEYCODE_DPAD_CENTER &&
+            consumeSpecialHelpKeyUp
+        ) {
+            consumeSpecialHelpKeyUp = false
+            return true
+        }
+
+        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+            consumeSpecialHelpKeyUp = false
             val now = SystemClock.elapsedRealtime()
             if (now - lastSpecialHelpKeyTime > SPECIAL_HELP_KEY_TIMEOUT_MILLIS) {
                 specialHelpKeyIndex = 0
             }
 
-            val normalizedKeyCode = when (keyCode) {
-                KeyEvent.KEYCODE_ENTER,
-                KeyEvent.KEYCODE_NUMPAD_ENTER
-                -> KeyEvent.KEYCODE_DPAD_CENTER
-
-                else -> keyCode
-            }
             if (normalizedKeyCode == SPECIAL_HELP_KEY_SEQUENCE[specialHelpKeyIndex]) {
                 specialHelpKeyIndex++
                 lastSpecialHelpKeyTime = now
                 if (specialHelpKeyIndex == SPECIAL_HELP_KEY_SEQUENCE.size) {
                     specialHelpKeyIndex = 0
                     publicHelpRequestTrigger++
+                    consumeSpecialHelpKeyUp = true
                     return true
                 }
             } else {
                 specialHelpKeyIndex =
-                    if (keyCode == SPECIAL_HELP_KEY_SEQUENCE.first()) 1 else 0
+                    if (normalizedKeyCode == SPECIAL_HELP_KEY_SEQUENCE.first()) 1 else 0
                 lastSpecialHelpKeyTime = now
             }
         }
-        return super.onKeyDown(keyCode, event)
+        return super.dispatchKeyEvent(event)
     }
 
     private companion object {

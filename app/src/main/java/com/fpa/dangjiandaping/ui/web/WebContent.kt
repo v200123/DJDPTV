@@ -38,6 +38,9 @@ import com.fpa.dangjiandaping.BuildConfig
 
 private const val FOCUS_LOG_TAG = "FocusTrace"
 private const val WEB_LOG_TAG = "WebContent"
+internal const val MOBILE_BROWSER_USER_AGENT =
+    "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 " +
+        "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
 private const val CAPTURE_WEB_FOCUS_SCRIPT =
     "(function(){var old=document.querySelector('[data-android-focus-return]');" +
         "if(old){old.removeAttribute('data-android-focus-return');}" +
@@ -223,6 +226,8 @@ internal fun WebContent(
 //                        Log.i(WEB_LOG_TAG, "WebView remote debugging enabled")
 //                    }
                     WebView(context).apply {
+                        val scrollStepPx = (72 * resources.displayMetrics.density).toInt()
+
                         webViewHolder[0] = this
                         layoutParams = ViewGroup.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
@@ -300,22 +305,35 @@ internal fun WebContent(
                             "AndroidFocusBridge"
                         )
                         setOnKeyListener { view, keyCode, event ->
-                            val shouldReturnToTabs =
-                                keyCode == KeyEvent.KEYCODE_DPAD_UP &&
-                                    event.action == KeyEvent.ACTION_DOWN &&
-                                    event.repeatCount == 0
-                            if (shouldReturnToTabs) {
-                                Log.d(
-                                    FOCUS_LOG_TAG,
-                                    "WebView DPAD_UP -> clear WebView focus and request last focused native tab"
-                                )
-                                view.post {
-                                    view.clearFocus()
-                                    onRequestNativeFocus()
-                                }
-                                true
-                            } else {
+                            if (event.action != KeyEvent.ACTION_DOWN) {
                                 false
+                            } else {
+                                when (keyCode) {
+                                    KeyEvent.KEYCODE_DPAD_UP -> {
+                                        if (view.canScrollVertically(-1)) {
+                                            view.scrollBy(0, -scrollStepPx)
+                                        } else if (event.repeatCount == 0) {
+                                            Log.d(
+                                                FOCUS_LOG_TAG,
+                                                "WebView reached top -> request native tab focus",
+                                            )
+                                            view.post {
+                                                view.clearFocus()
+                                                onRequestNativeFocus()
+                                            }
+                                        }
+                                        true
+                                    }
+
+                                    KeyEvent.KEYCODE_DPAD_DOWN -> {
+                                        if (view.canScrollVertically(1)) {
+                                            view.scrollBy(0, scrollStepPx)
+                                        }
+                                        true
+                                    }
+
+                                    else -> false
+                                }
                             }
                         }
                         webViewClient = object : WebViewClient() {
@@ -348,7 +366,15 @@ internal fun WebContent(
                                 onCanGoBackChanged(view.canGoBack())
                             }
                         }
-                        webChromeClient = WebChromeClient()
+                        webChromeClient = object : WebChromeClient() {
+                            override fun onReceivedTitle(view: WebView, title: String?) {
+                                super.onReceivedTitle(view, title)
+                                view.contentDescription = title
+                                    ?.trim()
+                                    ?.takeIf(String::isNotEmpty)
+                                    ?: "网页内容"
+                            }
+                        }
                         settings.apply {
                             javaScriptEnabled = true
                             domStorageEnabled = true
@@ -356,14 +382,18 @@ internal fun WebContent(
                             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                             cacheMode = WebSettings.LOAD_DEFAULT
                             useWideViewPort = true
-                            loadWithOverviewMode = true
+                            loadWithOverviewMode = false
                             builtInZoomControls = false
-                            displayZoomControls = false
-                            userAgentString = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 Edg/150.0.0.0"
+                            displayZoomControls = true
+                            userAgentString = MOBILE_BROWSER_USER_AGENT
                             setSupportZoom(true)
                         }
+                        isVerticalScrollBarEnabled = true
+                        isScrollbarFadingEnabled = false
+                        scrollBarStyle = View.SCROLLBARS_INSIDE_OVERLAY
                         tag = url
                         Log.i(WEB_LOG_TAG, "loadUrl(initial): $url")
+
                         loadUrl(url)
                         onCreated(this)
                     }
