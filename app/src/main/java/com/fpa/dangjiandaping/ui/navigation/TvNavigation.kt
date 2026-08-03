@@ -4,7 +4,8 @@ import androidx.navigation3.runtime.NavKey
 import kotlinx.serialization.Serializable
 
 //private const val BASE_URL = "http://192.168.20.233:5173/xiaoyuTv/#/"
-private const val BASE_URL = "http://192.168.20.118:5173/xiaoyuTv/#/"
+//private const val BASE_URL = "http://192.168.20.118:5173/xiaoyuTv/#/"
+private const val BASE_URL = "https://www.scycjy.gov.cn/xiaoyuTv/#/"
 
 private const val HOME_WEB_URL = "$BASE_URL"
 private const val PARTY_MEMBER_URL = "${BASE_URL}find-party-member"

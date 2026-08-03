@@ -40,7 +40,6 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -68,15 +67,6 @@ import kotlinx.coroutines.withContext
 import org.json.JSONArray
 import org.json.JSONObject
 import java.net.URL
-
-private val HelpDialogRed = Color(0xFF9F101B)
-private val HelpDialogDeepRed = Color(0xFF620810)
-private val HelpDialogCardRed = Color(0xB37A0D16)
-private val HelpDialogGold = Color(0xFFFFD27A)
-private val HelpDialogLightGold = Color(0xFFFFE7B2)
-private val HelpDialogWarmWhite = Color(0xFFFFF7ED)
-private val HelpDialogMutedText = Color(0xFFFFDAD2)
-private val HelpDialogGoldBorder = Color(0x99FFD27A)
 
 internal data class PublicHelpRequest(
     val id: String,
@@ -321,21 +311,13 @@ private fun PublicHelpRequestDialogContent(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.72f))
-            .padding(horizontal = 30.dp, vertical = 22.dp),
+            .background(Color.Black.copy(alpha = 0.30f)),
         contentAlignment = Alignment.Center,
     ) {
         Column(
             modifier = Modifier
-                .fillMaxSize()
-                .clip(panelShape)
-                .background(
-                    Brush.radialGradient(
-                        colors = listOf(HelpDialogRed, HelpDialogDeepRed),
-                        radius = 900f,
-                    ),
-                )
-                .border(1.dp, HelpDialogGoldBorder, panelShape)
+                .fillMaxSize(0.85f)
+                .tvDialogPanel(panelShape)
                 .padding(horizontal = 28.dp, vertical = 20.dp),
         ) {
             HelpDialogHeader(
@@ -457,14 +439,10 @@ private fun HelpDialogHeader(
 //                maxLines = 1,
 //            )
 //        }
-        HelpActionButton(
-            text = "×",
-            focusedColor = Color(0xFFC52A34),
-            normalColor = Color.Transparent,
+        TvDialogCloseButton(
             onClick = onDismiss,
-            compact = true,
+            focusRequester = closeFocusRequester,
             modifier = Modifier
-                .focusRequester(closeFocusRequester)
                 .focusProperties { down = leftContentFocusRequester },
         )
     }
@@ -645,7 +623,6 @@ private fun HelpActionButton(
     normalColor: Color,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
-    compact: Boolean = false,
 ) {
     var focused by remember { mutableStateOf(false) }
     val clickFocusRequester = remember { FocusRequester() }
@@ -653,11 +630,10 @@ private fun HelpActionButton(
         targetValue = if (focused) 1.035f else 1f,
         label = "helpActionScale",
     )
-    val shape = RoundedCornerShape(if (compact) 22.dp else 7.dp)
+    val shape = RoundedCornerShape(7.dp)
     Box(
         modifier = modifier
-            .height(if (compact) 44.dp else 52.dp)
-            .then(if (compact) Modifier.width(44.dp) else Modifier)
+            .height(52.dp)
             .onFocusChanged { focused = it.isFocused }
             .graphicsLayer {
                 scaleX = scale
@@ -676,13 +652,13 @@ private fun HelpActionButton(
                 clickFocusRequester.requestFocus()
                 onClick()
             }
-            .padding(horizontal = if (compact) 0.dp else 18.dp),
+            .padding(horizontal = 18.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = text,
             color = Color.White,
-            fontSize = if (compact) 27.sp else 18.sp,
+            fontSize = 18.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1,
         )

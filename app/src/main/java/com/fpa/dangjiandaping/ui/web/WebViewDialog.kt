@@ -12,16 +12,15 @@ import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -35,9 +34,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
-import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -46,7 +42,18 @@ import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.Text
-import com.fpa.dangjiandaping.ui.focus.focusOnClick
+
+private const val SCALE_WIDE_PAGE_SCRIPT =
+    "(function(){" +
+        "var root=document.documentElement;var body=document.body;" +
+        "if(!root){return false;}" +
+        "root.style.zoom='';" +
+        "var viewport=Math.max(root.clientWidth||0,window.innerWidth||0);" +
+        "var content=Math.max(root.scrollWidth||0,body?body.scrollWidth:0);" +
+        "var overflow=content>viewport+2;" +
+        "root.style.zoom=overflow?'0.7':'';" +
+        "return overflow;" +
+        "})();"
 
 /**
  * WebView 弹窗。
@@ -75,7 +82,7 @@ internal fun WebViewDialog(
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .background(ComposeColor.Black.copy(alpha = 0.72f))
+                .background(HelpDialogScrim)
                 .padding(horizontal = 42.dp, vertical = 28.dp),
             contentAlignment = Alignment.Center,
         ) {
@@ -83,42 +90,38 @@ internal fun WebViewDialog(
                 modifier = Modifier
                     .fillMaxWidth()
                     .fillMaxHeight()
-                    .clip(RoundedCornerShape(10.dp))
-                    .background(ComposeColor.White),
+                    .tvDialogPanel(RoundedCornerShape(12.dp))
+                    .padding(horizontal = 24.dp, vertical = 20.dp),
             ) {
-                Box(
+                Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(54.dp)
-                        .background(ComposeColor(0xFFFAFAFA))
-                        .padding(horizontal = 14.dp, vertical = 7.dp),
+                        .height(52.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         text = pageTitle.ifBlank { "网页详情" },
-                        color = ComposeColor(0xFF333333),
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Medium,
+                        color = HelpDialogWarmWhite,
+                        fontSize = 23.sp,
+                        fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier
-                            .align(Alignment.CenterStart)
-                            .fillMaxWidth()
-                            .padding(start = 8.dp, end = 94.dp),
+                        modifier = Modifier.weight(1f),
                     )
-                    WebViewDialogCloseButton(
+                    TvDialogCloseButton(
                         onClick = onDismiss,
                         focusRequester = closeFocusRequester,
-                        modifier = Modifier
-                            .align(Alignment.CenterEnd)
-                            .focusRequester(closeFocusRequester)
-                            .focusOnClick(closeFocusRequester),
                     )
                 }
+                Spacer(Modifier.height(14.dp))
 
                 AndroidView(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .weight(1f),
+                        .weight(1f)
+                        .clip(RoundedCornerShape(8.dp))
+                        .background(HelpDialogWarmWhite)
+                        .border(1.dp, HelpDialogGoldBorder, RoundedCornerShape(8.dp)),
                     factory = { context ->
                         val scrollStepPx =
                             (72 * context.resources.displayMetrics.density).toInt()
@@ -172,7 +175,16 @@ internal fun WebViewDialog(
                                 }
                                 false
                             }
-                            webViewClient = WebViewClient()
+                            webViewClient = object : WebViewClient() {
+                                override fun onPageFinished(view: WebView, url: String?) {
+                                    super.onPageFinished(view, url)
+                                    // Some pages finish laying out shortly after onPageFinished.
+                                    view.postDelayed(
+                                        { view.evaluateJavascript(SCALE_WIDE_PAGE_SCRIPT, null) },
+                                        300L,
+                                    )
+                                }
+                            }
                             webChromeClient = object : WebChromeClient() {
                                 override fun onReceivedTitle(view: WebView, title: String?) {
                                     super.onReceivedTitle(view, title)
@@ -240,45 +252,5 @@ internal fun WebViewDialog(
                 webView.isFocusableInTouchMode = true
             }
         }
-    }
-}
-
-@Composable
-private fun WebViewDialogCloseButton(
-    onClick: () -> Unit,
-    focusRequester: FocusRequester,
-    modifier: Modifier = Modifier,
-) {
-    var focused by remember { mutableStateOf(false) }
-    val shape = RoundedCornerShape(6.dp)
-
-    Box(
-        modifier = modifier
-            .size(width = 78.dp, height = 40.dp)
-            .clip(shape)
-            .background(
-                if (focused) ComposeColor(0xFFD7142B) else ComposeColor(0xFFF1F1F1),
-            )
-            .then(
-                if (focused) {
-                    Modifier.border(2.dp, ComposeColor(0xFFFFD36A), shape)
-                } else {
-                    Modifier
-                },
-            )
-            .onFocusChanged { focused = it.isFocused }
-            .clickable {
-                focusRequester.requestFocus()
-                onClick()
-            }
-            .focusable(),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = "关闭",
-            color = if (focused) ComposeColor.White else ComposeColor(0xFF333333),
-            fontSize = 17.sp,
-            fontWeight = FontWeight.Medium,
-        )
     }
 }

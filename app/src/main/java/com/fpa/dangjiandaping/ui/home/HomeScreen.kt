@@ -78,13 +78,14 @@ import com.fpa.dangjiandaping.ui.web.WebViewDialog
 import com.shuyu.gsyvideoplayer.compose.native_.GSYPlayState
 import com.shuyu.gsyvideoplayer.compose.native_.GSYPlayerSurface
 import com.shuyu.gsyvideoplayer.compose.native_.rememberGSYPlayerController
+import com.shuyu.gsyvideoplayer.video.base.GSYVideoView
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
-private const val DEFAULT_HOME_VIDEO_URL = "https://imgcdn.scdjw.com.cn/video/d28b65ed-ec69-490d-b339-9380572419f6.mp4"
+private const val DEFAULT_HOME_VIDEO_URL = "https://vod.scycjy.gov.cn/20260729/eE9NUYRQ/2000kb/hls/index.m3u8"
 private const val PARTY_PIONEER_MOBILE_URL = "https://12371.people.com.cn/"
 private const val PARTY_MEMBER_LEARNING_URL = "https://www.scycjy.gov.cn/dyxx_mys.html"
 private const val KANGBA_PARTY_FLAG_URL = "https://www.xyxf.gov.cn/#/index/subordinate/kbdqh"
@@ -525,9 +526,14 @@ private fun RuntimeVideoPlayer(
     LaunchedEffect(controller, active) {
         controller.setStartAfterPrepared(active)
         if (active) {
-            // GSY uses one process-wide playback manager. Another screen may have replaced
-            // this host as the current listener, so resume() alone cannot reclaim playback.
-            controller.play()
+            when (controller.withHost { it.currentState }) {
+                GSYVideoView.CURRENT_STATE_PAUSE -> controller.resume()
+                GSYVideoView.CURRENT_STATE_PREPAREING,
+                GSYVideoView.CURRENT_STATE_PLAYING,
+                GSYVideoView.CURRENT_STATE_PLAYING_BUFFERING_START,
+                -> Unit
+                else -> controller.play()
+            }
         } else {
             controller.pause()
         }
@@ -1206,7 +1212,7 @@ private fun HomePanel(
 private fun SectionTitle(@DrawableRes image: Int) {
     Image(painterResource(image), contentDescription = ""
         , contentScale = ContentScale.FillBounds
-        , modifier = Modifier.height(29.dp))
+        , modifier = Modifier.width(299.dp).height(28.dp))
 }
 
 @Composable

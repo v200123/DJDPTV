@@ -2,11 +2,9 @@ package com.fpa.dangjiandaping.ui.web
 
 import android.graphics.BitmapFactory
 import android.net.Uri
-import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,6 +12,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -31,17 +30,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.input.key.Key
 import androidx.compose.ui.input.key.KeyEventType
 import androidx.compose.ui.input.key.key
@@ -56,7 +51,6 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.Text
-import com.fpa.dangjiandaping.ui.focus.focusOnClick
 import androidx.tv.material3.MaterialTheme
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -276,120 +270,131 @@ private fun ServiceTeamDialogContent(team: ServiceTeam, onDismiss: () -> Unit) {
     val coroutineScope = rememberCoroutineScope()
     Box(
         modifier = Modifier
-            .fillMaxWidth(0.9f)
-            .fillMaxHeight(0.92f)
-            .clip(RoundedCornerShape(16.dp))
-            .background(Color(0xFFB51F24))
-            .border(1.dp, Color(0xFFFFD889), RoundedCornerShape(16.dp))
-            .padding(horizontal = 28.dp, vertical = 22.dp)
-            .onPreviewKeyEvent { event ->
-                if (event.type != KeyEventType.KeyDown) {
-                    return@onPreviewKeyEvent false
-                }
-                when (event.key) {
-                    Key.DirectionDown -> {
-                        if (!contentListState.canScrollForward) {
-                            false
-                        } else {
-                            contentFocusRequester.requestFocus()
-                            coroutineScope.launch { contentListState.animateScrollBy(190f) }
-                            true
-                        }
-                    }
-                    Key.DirectionUp -> {
-                        if (!contentListState.canScrollBackward) {
-                            false
-                        } else {
-                            contentFocusRequester.requestFocus()
-                            coroutineScope.launch { contentListState.animateScrollBy(-190f) }
-                            true
-                        }
-                    }
-                    else -> false
-                }
-            },
+            .fillMaxSize()
+            .background(HelpDialogScrim),
+        contentAlignment = Alignment.Center,
     ) {
-        LazyColumn(
-            state = contentListState,
+        Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight()
-                .focusRequester(contentFocusRequester)
-                .focusable(),
-            verticalArrangement = Arrangement.spacedBy(16.dp),
+                .fillMaxSize(0.85f)
+                .tvDialogPanel(RoundedCornerShape(12.dp))
+                .padding(horizontal = 28.dp, vertical = 22.dp)
+                .onPreviewKeyEvent { event ->
+                    if (event.type != KeyEventType.KeyDown) {
+                        return@onPreviewKeyEvent false
+                    }
+                    when (event.key) {
+                        Key.DirectionDown -> {
+                            if (!contentListState.canScrollForward) {
+                                false
+                            } else {
+                                contentFocusRequester.requestFocus()
+                                coroutineScope.launch { contentListState.animateScrollBy(190f) }
+                                true
+                            }
+                        }
+                        Key.DirectionUp -> {
+                            if (!contentListState.canScrollBackward) {
+                                false
+                            } else {
+                                contentFocusRequester.requestFocus()
+                                coroutineScope.launch { contentListState.animateScrollBy(-190f) }
+                                true
+                            }
+                        }
+                        else -> false
+                    }
+                },
         ) {
-            item {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    Text(
-                        text = team.name,
-                        color = Color.White,
-                        fontSize = 29.sp,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.weight(1f),
-                    )
-                    DialogActionButton(
-                        text = "×",
-                        color = Color.White,
-                        onClick = onDismiss,
-                        modifier = Modifier.focusRequester(closeFocusRequester),
-                    )
-                }
-            }
-            if (team.services.isNotEmpty()) {
+            LazyColumn(
+                state = contentListState,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .fillMaxHeight()
+                    .focusRequester(contentFocusRequester)
+                    .focusable(),
+                verticalArrangement = Arrangement.spacedBy(16.dp),
+            ) {
                 item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
-                        ServiceLabels(team.services)
-                    }
-                }
-            }
-            if (team.introduction.isNotBlank()) {
-                item {
-                    ServiceSection(title = "服务队简介") {
                         Text(
-                            text = team.introduction,
-                            color = Color(0xFF5A2020),
-                            fontSize = 17.sp,
-                            lineHeight = 26.sp,
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(Color(0xFFFFF7F2))
-                                .padding(16.dp),
+                            text = team.name,
+                            color = Color.White,
+                            fontSize = 29.sp,
+                            fontWeight = FontWeight.Bold,
+                            modifier = Modifier.weight(1f),
+                        )
+                        TvDialogCloseButton(
+                            onClick = onDismiss,
+                            focusRequester = closeFocusRequester,
                         )
                     }
                 }
-            }
-            if (team.photos.isNotEmpty()) {
-                item {
-                    ServiceSection(title = "服务队照片") {
-                        LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                            items(team.photos) { photo ->
-                                RemoteImage(
-                                    url = photo,
-                                    modifier = Modifier
-                                        .size(width = 210.dp, height = 126.dp)
-                                        .clip(RoundedCornerShape(12.dp))
-                                        .border(1.dp, Color(0xFFFFD889), RoundedCornerShape(12.dp)),
-                                )
+                if (team.services.isNotEmpty()) {
+                    item {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            ServiceLabels(team.services)
+                        }
+                    }
+                }
+                if (team.introduction.isNotBlank()) {
+                    item {
+                        ServiceSection(title = "服务队简介") {
+                            Text(
+                                text = team.introduction,
+                                color = HelpDialogWarmWhite,
+                                fontSize = 17.sp,
+                                lineHeight = 26.sp,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clip(RoundedCornerShape(12.dp))
+                                    .background(HelpDialogCardRed)
+                                    .border(
+                                        1.dp,
+                                        HelpDialogGoldBorder,
+                                        RoundedCornerShape(12.dp),
+                                    )
+                                    .padding(16.dp),
+                            )
+                        }
+                    }
+                }
+                if (team.photos.isNotEmpty()) {
+                    item {
+                        ServiceSection(title = "服务队照片") {
+                            LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                                items(team.photos) { photo ->
+                                    RemoteImage(
+                                        url = photo,
+                                        modifier = Modifier
+                                            .size(width = 210.dp, height = 126.dp)
+                                            .clip(RoundedCornerShape(12.dp))
+                                            .border(
+                                                1.dp,
+                                                HelpDialogGoldBorder,
+                                                RoundedCornerShape(12.dp),
+                                            ),
+                                    )
+                                }
                             }
                         }
                     }
                 }
-            }
-            if (team.members.isNotEmpty()) {
-                item { SectionHeading("服务队成员") }
-                items(team.members) { member ->
-                    ServiceTeamMemberCard(member = member)
+                if (team.members.isNotEmpty()) {
+                    item { SectionHeading("服务队成员") }
+                    items(team.members) { member ->
+                        ServiceTeamMemberCard(member = member)
+                    }
                 }
+                item { Spacer(Modifier.height(4.dp)) }
             }
-            item { Spacer(Modifier.height(4.dp)) }
         }
     }
     LaunchedEffect(team.name) { closeFocusRequester.requestFocus() }
@@ -411,7 +416,7 @@ private fun SectionHeading(title: String) {
                 .width(4.dp)
                 .height(22.dp)
                 .clip(RoundedCornerShape(4.dp))
-                .background(Color(0xFFFFD889)),
+                .background(HelpDialogGold),
         )
         Text(title, fontSize = 21.sp, fontWeight = FontWeight.Bold, color = Color.White)
     }
@@ -423,8 +428,8 @@ private fun ServiceTeamMemberCard(member: ServiceTeamMember) {
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(10.dp))
-            .background(Color(0xFFFFF7F2))
-            .border(1.dp, Color(0xFFFFD889), RoundedCornerShape(10.dp))
+            .background(HelpDialogCardRed)
+            .border(1.dp, HelpDialogGoldBorder, RoundedCornerShape(10.dp))
             .padding(16.dp),
         horizontalArrangement = Arrangement.spacedBy(14.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -435,9 +440,9 @@ private fun ServiceTeamMemberCard(member: ServiceTeamMember) {
             modifier = Modifier.size(width = 128.dp, height = 112.dp).clip(RoundedCornerShape(8.dp)),
         )
         Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(5.dp)) {
-            Text("姓名：${member.name}", color = Color(0xFF1E1E1E), fontSize = 18.sp, fontWeight = FontWeight.Bold)
-            if (member.role.isNotBlank()) Text("职务：${member.role}", color = Color(0xFF333333), fontSize = 16.sp)
-            if (member.phone.isNotBlank()) Text("联系电话：${member.phone}", color = Color(0xFF8E2525), fontSize = 16.sp)
+            Text("姓名：${member.name}", color = HelpDialogWarmWhite, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+            if (member.role.isNotBlank()) Text("职务：${member.role}", color = HelpDialogMutedText, fontSize = 16.sp)
+            if (member.phone.isNotBlank()) Text("联系电话：${member.phone}", color = HelpDialogLightGold, fontSize = 16.sp)
             if (member.services.isNotEmpty()) ServiceLabels(member.services)
         }
     }
@@ -447,15 +452,15 @@ private fun ServiceTeamMemberCard(member: ServiceTeamMember) {
 private fun ServiceLabels(services: List<String>, modifier: Modifier = Modifier) {
     Text(
         text = services.take(4).mapIndexed { index, service -> "${serviceIcon(index)} $service" }.joinToString("   "),
-        color = Color(0xFFFFF2C7),
+        color = HelpDialogLightGold,
         fontSize = 16.sp,
         fontWeight = FontWeight.Medium,
         maxLines = 2,
         overflow = TextOverflow.Ellipsis,
         modifier = modifier
             .clip(RoundedCornerShape(8.dp))
-            .background(Color(0xFF97171C))
-            .border(1.dp, Color(0x66FFD889), RoundedCornerShape(8.dp))
+            .background(HelpDialogCardRed)
+            .border(1.dp, HelpDialogGoldBorder, RoundedCornerShape(8.dp))
             .padding(horizontal = 12.dp, vertical = 8.dp),
     )
 }
@@ -465,38 +470,6 @@ private fun serviceIcon(index: Int): String = when (index % 4) {
     1 -> "▲"
     2 -> "◆"
     else -> "♻"
-}
-
-@Composable
-private fun DialogActionButton(
-    text: String,
-    color: Color,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    var focused by remember { mutableStateOf(false) }
-    val clickFocusRequester = remember { FocusRequester() }
-    val scale by animateFloatAsState(if (focused) 1.05f else 1f, label = "serviceTeamActionScale")
-    val shape = RoundedCornerShape(8.dp)
-    Box(
-        modifier = modifier
-            .height(44.dp)
-            .onFocusChanged { focused = it.isFocused }
-            .graphicsLayer { scaleX = scale; scaleY = scale }
-            .clip(shape)
-            .background(color)
-            .border(if (focused) 2.dp else 0.dp, Color(0xFFFFD889), shape)
-            .focusRequester(clickFocusRequester)
-            .focusOnClick(clickFocusRequester)
-            .clickable {
-                clickFocusRequester.requestFocus()
-                onClick()
-            }
-            .padding(horizontal = 16.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(text, color = if (text == "×") Color(0xFFB51F24) else Color.White, fontSize = 17.sp, fontWeight = FontWeight.Medium)
-    }
 }
 
 @Composable
@@ -513,8 +486,8 @@ private fun RemoteImage(url: String, modifier: Modifier, fallbackText: String = 
     if (bitmap != null) {
         Image(bitmap = bitmap!!.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = modifier)
     } else {
-        Box(modifier.background(Color(0xFFE8E8E8)), contentAlignment = Alignment.Center) {
-            Text(fallbackText, color = Color(0xFF777777), fontSize = 14.sp)
+        Box(modifier.background(HelpDialogCardRed), contentAlignment = Alignment.Center) {
+            Text(fallbackText, color = HelpDialogLightGold, fontSize = 14.sp)
         }
     }
 }

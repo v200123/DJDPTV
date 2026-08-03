@@ -10,6 +10,9 @@ import android.view.SoundEffectConstants
 import android.view.View
 import android.webkit.WebView
 import androidx.activity.compose.BackHandler
+import androidx.compose.animation.EnterTransition
+import androidx.compose.animation.ExitTransition
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -23,7 +26,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -31,7 +33,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
-import androidx.compose.ui.zIndex
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -44,7 +45,10 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
 import androidx.navigationevent.compose.rememberNavigationEventDispatcherOwner
+import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.runtime.entryProvider
 import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.navigation3.ui.NavDisplay
 import androidx.tv.material3.MaterialTheme
 import com.fpa.dangjiandaping.R
 import com.fpa.dangjiandaping.ui.MainContentHorizontalPadding
@@ -99,8 +103,14 @@ fun DangJianTvScreen(
     val isInPreview = LocalInspectionMode.current
 
     fun replaceRoute(route: TvRoute) {
-        backStack.clear()
-        backStack.add(route)
+        if (backStack.isEmpty()) {
+            backStack.add(route)
+            return
+        }
+        backStack[backStack.lastIndex] = route
+        while (backStack.size > 1) {
+            backStack.removeAt(0)
+        }
     }
 
     fun requestSelectedTabFocus() {
@@ -110,6 +120,10 @@ fun DangJianTvScreen(
 
     fun activateRoute(tabIndex: Int, targetRoute: TvRoute, moveFocusToContent: Boolean) {
         lastFocusedTab = tabIndex
+        // NavDisplay disposes the previous entry. During disposal Compose may temporarily restore
+        // focus to the Home tab; keep the intended tab pending so that transient focus event does
+        // not get interpreted by onTabFocused as a navigation back to Home.
+        pendingTabFocusIndex = if (moveFocusToContent) null else tabIndex
         if (targetRoute != currentRoute) {
             webView = null
             replaceRoute(targetRoute)
@@ -286,38 +300,35 @@ fun DangJianTvScreen(
                     .onFocusChanged { headerHasFocus = it.hasFocus },
             )
             Spacer(modifier = Modifier.height(6.dp))
-            Box(
+            NavDisplay(
+                backStack = backStack,
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
                     .padding(horizontal = MainContentHorizontalPadding)
                     .clipToBounds(),
-            ) {
-                val homeIsActive = currentRoute == HomeRoute
-                HomeScreen(
-                    active = homeIsActive,
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .zIndex(if (homeIsActive) 1f else 0f),
-                    partyStats = partyStats,
-                    contentFocusRequester = contentFocusRequester,
-                    onRequestTabFocus = ::requestSelectedTabFocus,
-                    onCoursewareClick = ::openCourseware,
-                    onPartyBuildingClick = ::openPartyBuilding,
-                )
-
-                TV_TABS.forEachIndexed { tabIndex, tab ->
-                    val defaultRoute =
-                        tab.destination.toRoute(tabIndex) as? WebRoute ?: return@forEachIndexed
-                    val route = (currentRoute as? WebRoute)
-                        ?.takeIf { it.tabIndex == tabIndex }
-                        ?: defaultRoute
-                    val webIsActive =
-                        currentRoute is WebRoute && currentRoute.tabIndex == tabIndex
-                    key(route.url) {
+                onBack = ::handleBack,
+                transitionSpec = { EnterTransition.None togetherWith ExitTransition.None },
+                popTransitionSpec = { EnterTransition.None togetherWith ExitTransition.None },
+                predictivePopTransitionSpec = {
+                    EnterTransition.None togetherWith ExitTransition.None
+                },
+                entryProvider = entryProvider<NavKey> {
+                    entry<HomeRoute> {
+                        HomeScreen(
+                            active = currentRoute == HomeRoute && publicHelpRequest == null,
+                            modifier = Modifier.fillMaxSize(),
+                            partyStats = partyStats,
+                            contentFocusRequester = contentFocusRequester,
+                            onRequestTabFocus = ::requestSelectedTabFocus,
+                            onCoursewareClick = ::openCourseware,
+                            onPartyBuildingClick = ::openPartyBuilding,
+                        )
+                    }
+                    entry<WebRoute> { route ->
                         WebContent(
                             url = route.url,
-                            active = webIsActive,
+                            active = currentRoute == route,
                             onCreated = { createdView ->
                                 if (currentRoute == route) webView = createdView
                             },
@@ -336,12 +347,11 @@ fun DangJianTvScreen(
                                 .padding(
                                     top = 8.dp,
                                     bottom = 10.dp,
-                                )
-                                .zIndex(if (webIsActive) 1f else 0f),
+                                ),
                         )
                     }
-                }
-            }
+                },
+            )
         }
 
         publicHelpRequest?.let { request ->

@@ -177,39 +177,34 @@ private fun NewsDetailDialogContent(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.Black.copy(alpha = 0.72f))
-            .padding(horizontal = 42.dp, vertical = 28.dp),
+            .background(HelpDialogScrim),
         contentAlignment = Alignment.Center
     ) {
         Column(
             modifier = Modifier
-                .fillMaxWidth()
-                .fillMaxHeight()
-                .clip(RoundedCornerShape(10.dp))
-                .background(Color(0xFFFCFCFC))
+                .fillMaxSize(0.85f)
+                .tvDialogPanel(RoundedCornerShape(12.dp))
                 .padding(horizontal = 30.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Box(modifier = Modifier.fillMaxWidth()) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(18.dp),
+            ) {
                 Text(
                     text = news.title,
-                    color = Color(0xFFD7142B),
+                    color = Color.White,
                     fontSize = 27.sp,
                     lineHeight = 36.sp,
-                    fontWeight = FontWeight.Medium,
-                    textAlign = TextAlign.Center,
+                    fontWeight = FontWeight.Bold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(horizontal = 72.dp, vertical = 4.dp)
+                    modifier = Modifier.weight(1f),
                 )
-                TvActionButton(
-                    text = "关闭",
+                TvDialogCloseButton(
                     onClick = onDismiss,
-                    modifier = Modifier
-                        .align(Alignment.TopEnd)
-                        .focusRequester(closeFocusRequester)
+                    focusRequester = closeFocusRequester,
                 )
             }
 
@@ -222,7 +217,7 @@ private fun NewsDetailDialogContent(
             if (audioVideos.isEmpty()) {
                 Text(
                     text = "当前新闻数据未提供音频地址",
-                    color = Color(0xFF777777),
+                    color = HelpDialogMutedText,
                     fontSize = 16.sp,
                     modifier = Modifier.padding(vertical = 8.dp)
                 )
@@ -260,8 +255,8 @@ private fun NewsDetailDialogContent(
                     .fillMaxWidth()
                     .weight(1f)
                     .clip(RoundedCornerShape(6.dp))
-                    .background(Color.White)
-                    .border(1.dp, Color(0xFFE5E5E5), RoundedCornerShape(6.dp))
+                    .background(HelpDialogCardRed)
+                    .border(1.dp, HelpDialogGoldBorder, RoundedCornerShape(6.dp))
             )
         }
     }
@@ -281,13 +276,15 @@ private fun NewsMetadata(news: NewsDetail) {
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFFF1F1F1))
+            .clip(RoundedCornerShape(7.dp))
+            .background(HelpDialogCardRed)
+            .border(1.dp, HelpDialogGoldBorder, RoundedCornerShape(7.dp))
             .padding(horizontal = 18.dp, vertical = 10.dp),
         contentAlignment = Alignment.Center
     ) {
         Text(
             text = metadata.joinToString("       "),
-            color = Color(0xFF666666),
+            color = HelpDialogLightGold,
             fontSize = 15.sp,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
@@ -312,7 +309,7 @@ private fun NewsAudioPlayer(
         ) {
             Text(
                 text = audio.displayName,
-                color = Color(0xFF202020),
+                color = HelpDialogLightGold,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Medium,
                 maxLines = 1
@@ -391,7 +388,7 @@ private fun NewsAudioPlayer(
     ) {
         Text(
             text = audio.displayName,
-            color = Color(0xFF202020),
+            color = HelpDialogLightGold,
             fontSize = 17.sp,
             fontWeight = FontWeight.Medium,
             maxLines = 1
@@ -421,14 +418,14 @@ private fun TvActionButton(
     val clickFocusRequester = remember { FocusRequester() }
     val shape = RoundedCornerShape(22.dp)
     val backgroundColor = when {
-        !enabled -> Color(0xFFE8E8E8)
-        focused -> Color(0xFFD7142B)
-        else -> Color(0xFFF0F1F2)
+        !enabled -> Color(0x667A0D16)
+        focused -> Color(0xFFD52B38)
+        else -> HelpDialogCardRed
     }
     val textColor = when {
-        !enabled -> Color(0xFF999999)
+        !enabled -> HelpDialogMutedText.copy(alpha = 0.55f)
         focused -> Color.White
-        else -> Color(0xFF202020)
+        else -> HelpDialogWarmWhite
     }
 
     Box(
@@ -439,7 +436,7 @@ private fun TvActionButton(
             .background(backgroundColor)
             .border(
                 width = if (focused) 2.dp else 1.dp,
-                color = if (focused) Color(0xFFFFD186) else Color(0xFFD9D9D9),
+                color = if (focused) HelpDialogGold else HelpDialogGoldBorder,
                 shape = shape
             )
             .focusRequester(clickFocusRequester)
@@ -470,7 +467,7 @@ private fun NewsHtmlContent(
     if (LocalInspectionMode.current) {
         Text(
             text = htmlToPlainText(html),
-            color = Color(0xFF171717),
+            color = HelpDialogWarmWhite,
             fontSize = 18.sp,
             lineHeight = 32.sp,
             modifier = modifier.padding(horizontal = 24.dp, vertical = 18.dp)
@@ -478,7 +475,8 @@ private fun NewsHtmlContent(
         return
     }
 
-    val textColor = Color(0xFF171717).toArgb()
+    val textColor = HelpDialogWarmWhite.toArgb()
+    val backgroundColor = HelpDialogCardRed.toArgb()
     AndroidView(
         modifier = modifier,
         factory = { context ->
@@ -486,6 +484,7 @@ private fun NewsHtmlContent(
                 val scrollStepPx = (72 * resources.displayMetrics.density).toInt()
 
                 setTextColor(textColor)
+                setBackgroundColor(backgroundColor)
                 textSize = 18f
                 setLineSpacing(8f, 1.25f)
                 setPadding(24, 18, 24, 24)

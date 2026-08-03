@@ -165,12 +165,9 @@ private fun HeaderTabRow(
                         } }
                     .onPreviewKeyEvent { event ->
                         val moveToContent = event.type == KeyEventType.KeyDown &&
-                            event.key in setOf(
-                                Key.DirectionDown,
-                                Key.Enter,
-                                Key.NumPadEnter,
-                                Key.DirectionCenter,
-                            )
+                            event.key == Key.DirectionDown
+                        // Confirmation keys select the tab via selectable.onClick, but keep
+                        // focus in the tab row. Only DPAD_DOWN enters the content area.
                         if (moveToContent) {
                             onTabDown(index)
                             true
