@@ -2,6 +2,7 @@ package com.fpa.dangjiandaping.ui.web
 
 import android.annotation.SuppressLint
 import android.graphics.Color
+import android.os.Build
 import android.util.Log
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -18,6 +19,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -32,15 +34,19 @@ import androidx.compose.ui.graphics.Color as ComposeColor
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.fpa.dangjiandaping.BuildConfig
 
 private const val FOCUS_LOG_TAG = "FocusTrace"
 private const val WEB_LOG_TAG = "WebContent"
-internal const val MOBILE_BROWSER_USER_AGENT =
-    "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 " +
-        "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+//internal const val MOBILE_BROWSER_USER_AGENT =
+//    "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 " +
+//        "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+        internal const val MOBILE_BROWSER_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36 Edg/151.0.0.0"
 private const val CAPTURE_WEB_FOCUS_SCRIPT =
     "(function(){var old=document.querySelector('[data-android-focus-return]');" +
         "if(old){old.removeAttribute('data-android-focus-return');}" +
@@ -147,6 +153,7 @@ internal fun WebContent(
     url: String,
     active: Boolean,
     onCreated: (WebView) -> Unit,
+    onPageReadyChanged: (WebView, Boolean) -> Unit,
     onReleased: (WebView) -> Unit,
     onCanGoBackChanged: (Boolean) -> Unit,
     onRequestNativeFocus: () -> Unit,
@@ -169,6 +176,22 @@ internal fun WebContent(
     var restoreNewsDetailFocus by remember(url) { mutableStateOf(false) }
     var restoreServiceTeamFocus by remember(url) { mutableStateOf(false) }
     val webViewHolder = remember { arrayOfNulls<WebView>(1) }
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var appInForeground by remember(lifecycleOwner) {
+        mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+    }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> appInForeground = true
+                Lifecycle.Event.ON_PAUSE -> appInForeground = false
+                else -> Unit
+            }
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
 
     LaunchedEffect(newsDetail, restoreNewsDetailFocus) {
         if (newsDetail == null && restoreNewsDetailFocus) {
@@ -229,6 +252,9 @@ internal fun WebContent(
                         val scrollStepPx = (72 * resources.displayMetrics.density).toInt()
 
                         webViewHolder[0] = this
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            defaultFocusHighlightEnabled = false
+                        }
                         layoutParams = ViewGroup.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
@@ -345,6 +371,7 @@ internal fun WebContent(
                                 super.onPageStarted(view, url, favicon)
                                 Log.i(WEB_LOG_TAG, "onPageStarted: $url")
                                 loadingUrl = view.tag as? String ?: url
+                                onPageReadyChanged(view, false)
                             }
 
                             override fun onPageCommitVisible(view: WebView, url: String?) {
@@ -356,6 +383,7 @@ internal fun WebContent(
                                 super.onPageFinished(view, url)
                                 Log.i(WEB_LOG_TAG, "onPageFinished: $url")
                                 loadingUrl = null
+                                onPageReadyChanged(view, true)
                             }
                             override fun doUpdateVisitedHistory(
                                 view: WebView,
@@ -401,12 +429,19 @@ internal fun WebContent(
                 update = { view ->
                     view.visibility = if (active) View.VISIBLE else View.INVISIBLE
                     view.isActivated = active
-                    val webViewInteractive = active
+                    val webViewInteractive = active &&
+                        appInForeground &&
+                        newsDetail == null &&
+                        serviceTeam == null &&
+                        webViewDialogUrl == null
                     view.isFocusable = webViewInteractive
                     view.isFocusableInTouchMode = webViewInteractive
-                    if (active) {
+                    if (webViewInteractive) {
+                        view.onResume()
                         onCreated(view)
                         onCanGoBackChanged(view.canGoBack())
+                    } else {
+                        view.onPause()
                     }
                     if (!webViewInteractive && view.hasFocus()) {
                         view.clearFocus()
@@ -429,6 +464,7 @@ internal fun WebContent(
                     if (webViewHolder[0] === view) {
                         webViewHolder[0] = null
                     }
+                    onPageReadyChanged(view, false)
                     onCanGoBackChanged(false)
                     onReleased(view)
                     view.stopLoading()
@@ -506,6 +542,7 @@ private fun WebContentPreview() {
             url = "https://www.baidu.com",
             active = true,
             onCreated = {},
+            onPageReadyChanged = { _, _ -> },
             onReleased = {},
             onCanGoBackChanged = {},
             onRequestNativeFocus = {},

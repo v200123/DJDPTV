@@ -33,6 +33,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
@@ -69,6 +70,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.LifecycleEventObserver
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.compose.ui.zIndex
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
@@ -144,6 +148,7 @@ internal fun HomeScreen(
     val fullscreenFocusRequester = remember { FocusRequester() }
     val videoControlFocusRequester = remember { FocusRequester() }
     val firstPartyBuildingFocusRequester = remember { FocusRequester() }
+    val cadreAppointmentFocusRequester = remember { FocusRequester() }
     var webViewDialogUrl by remember { mutableStateOf<String?>(null) }
 
     Box(
@@ -188,7 +193,7 @@ internal fun HomeScreen(
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 HomeVideoPlayer(
-                    active = active,
+                    active = active && webViewDialogUrl == null,
                     videoUrl = videoUrl,
                     playFocusRequester = videoControlFocusRequester,
                     fullscreenFocusRequester = fullscreenFocusRequester,
@@ -202,6 +207,7 @@ internal fun HomeScreen(
                     videoControlFocusRequester = videoControlFocusRequester,
                     topFocusRequester = contentFocusRequester,
                     firstItemFocusRequester = firstPartyBuildingFocusRequester,
+                    cadreAppointmentFocusRequester = cadreAppointmentFocusRequester,
                     onPartyBuildingClick = onPartyBuildingClick,
                     onCadreClick = { webViewDialogUrl = CADRE_APPOINTMENT_URL },
                     modifier = Modifier
@@ -225,7 +231,7 @@ internal fun HomeScreen(
                         .fillMaxHeight(),
                 )
                 CoursewarePanel(
-                    leftTopicFocusRequester = lastTopicFocusRequester,
+                    cadreAppointmentFocusRequester = cadreAppointmentFocusRequester,
                     onCoursewareClick = onCoursewareClick,
                     modifier = Modifier
                         .weight(1.08f)
@@ -523,20 +529,55 @@ private fun RuntimeVideoPlayer(
         title = "康巴党旗红",
         autoPlay = true,
     )
-    LaunchedEffect(controller, active) {
-        controller.setStartAfterPrepared(active)
-        if (active) {
-            when (controller.withHost { it.currentState }) {
-                GSYVideoView.CURRENT_STATE_PAUSE -> controller.resume()
-                GSYVideoView.CURRENT_STATE_PREPAREING,
-                GSYVideoView.CURRENT_STATE_PLAYING,
-                GSYVideoView.CURRENT_STATE_PLAYING_BUFFERING_START,
-                -> Unit
-                else -> controller.play()
+    val snapshot by controller.snapshot
+    val lifecycleOwner = LocalLifecycleOwner.current
+    var appInForeground by remember(lifecycleOwner) {
+        mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
+    }
+    var previousPlaybackAllowed by remember(controller) { mutableStateOf<Boolean?>(null) }
+    var resumeAfterInterruption by remember(controller) { mutableStateOf(true) }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = LifecycleEventObserver { _, event ->
+            when (event) {
+                Lifecycle.Event.ON_RESUME -> appInForeground = true
+                Lifecycle.Event.ON_PAUSE -> appInForeground = false
+                else -> Unit
             }
-        } else {
-            controller.pause()
         }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+    val playbackAllowed = active && appInForeground
+    LaunchedEffect(controller, playbackAllowed) {
+        val wasAllowed = previousPlaybackAllowed
+        if (!playbackAllowed) {
+            if (wasAllowed == true) {
+                resumeAfterInterruption = when (controller.withHost { it.currentState }) {
+                    GSYVideoView.CURRENT_STATE_PREPAREING,
+                    GSYVideoView.CURRENT_STATE_PLAYING,
+                    GSYVideoView.CURRENT_STATE_PLAYING_BUFFERING_START,
+                    -> true
+                    else -> false
+                }
+            }
+            controller.setStartAfterPrepared(false)
+            controller.pause()
+        } else if (wasAllowed != true) {
+            controller.setStartAfterPrepared(resumeAfterInterruption)
+            if (resumeAfterInterruption) {
+                when (controller.withHost { it.currentState }) {
+                    GSYVideoView.CURRENT_STATE_PAUSE -> controller.resume()
+                    GSYVideoView.CURRENT_STATE_PREPAREING,
+                    GSYVideoView.CURRENT_STATE_PLAYING,
+                    GSYVideoView.CURRENT_STATE_PLAYING_BUFFERING_START,
+                    -> Unit
+                    else -> controller.play()
+                }
+            }
+        }
+        previousPlaybackAllowed = playbackAllowed
     }
     // GSY 已在应用入口切换到 Exo2/Media3 内核。对 HLS 地址再显式声明格式，
     // 可避免带 query 参数的 m3u8 链接被错误按普通媒体源解析。
@@ -545,7 +586,6 @@ private fun RuntimeVideoPlayer(
             if (isHlsVideoUrl(videoUrl)) "m3u8" else null,
         )
     }
-    val snapshot by controller.snapshot
     var dragging by remember { mutableStateOf(false) }
     var dragFraction by remember { mutableFloatStateOf(0f) }
     var surfaceGeneration by remember { mutableStateOf(0) }
@@ -872,6 +912,7 @@ private fun PartyWorkPanel(
     videoControlFocusRequester: FocusRequester,
     topFocusRequester: FocusRequester?,
     firstItemFocusRequester: FocusRequester,
+    cadreAppointmentFocusRequester: FocusRequester,
     onPartyBuildingClick: (Int) -> Unit,
     onCadreClick: () -> Unit,
     modifier: Modifier = Modifier,
@@ -916,10 +957,17 @@ private fun PartyWorkPanel(
                 alignment = Alignment.CenterVertically,
             ),
         ) {
-            cadreTasks.take(2).forEach { task ->
+            cadreTasks.take(2).forEachIndexed { index, task ->
                 PartyPanelFocusableItem(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .then(
+                            if (index == 1) {
+                                Modifier.focusRequester(cadreAppointmentFocusRequester)
+                            } else {
+                                Modifier
+                            }
+                        )
                         .focusProperties { left = videoControlFocusRequester },
                     onClick = onCadreClick,
                 ) {
@@ -1134,7 +1182,7 @@ private fun FeatureCard(
 
 @Composable
 private fun CoursewarePanel(
-    leftTopicFocusRequester: FocusRequester,
+    cadreAppointmentFocusRequester: FocusRequester,
     onCoursewareClick: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1148,21 +1196,21 @@ private fun CoursewarePanel(
             FeatureCard(
                 modifier = Modifier
                     .weight(1f)
-                    .focusProperties { up = leftTopicFocusRequester },
+                    .focusProperties { up = cadreAppointmentFocusRequester },
                 image = R.drawable.ic_home_kejian_01,
                 onClick = { onCoursewareClick(1) },
             )
             FeatureCard(
                 modifier = Modifier
                     .weight(1f)
-                    .focusProperties { up = leftTopicFocusRequester },
+                    .focusProperties { up = cadreAppointmentFocusRequester },
                 image = R.drawable.ic_home_kejian_02,
                 onClick = { onCoursewareClick(2) },
             )
             FeatureCard(
                     modifier = Modifier
                         .weight(1f)
-                        .focusProperties { up = leftTopicFocusRequester },
+                        .focusProperties { up = cadreAppointmentFocusRequester },
             image = R.drawable.ic_home_kejian_03,
             onClick = { onCoursewareClick(3) },
             )

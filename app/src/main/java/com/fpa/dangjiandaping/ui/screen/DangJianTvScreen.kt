@@ -5,9 +5,7 @@ import android.content.Context
 import android.content.ContextWrapper
 import android.media.AudioManager
 import android.media.ToneGenerator
-import android.view.KeyEvent
 import android.view.SoundEffectConstants
-import android.view.View
 import android.webkit.WebView
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.EnterTransition
@@ -74,6 +72,11 @@ import kotlin.random.Random
 private const val HOME_TAB_INDEX = 0
 private const val MOCK_HELP_MIN_DELAY_MILLIS = 5_000L
 private const val MOCK_HELP_MAX_DELAY_MILLIS = 12_001L
+private const val CLEAR_WEB_DOM_FOCUS_SCRIPT =
+    "(function(){var el=document.activeElement;" +
+        "if(el&&el!==document.body&&el!==document.documentElement&&" +
+        "typeof el.blur==='function'){el.blur();}" +
+        "return true;})();"
 
 @Composable
 fun DangJianTvScreen(
@@ -89,6 +92,7 @@ fun DangJianTvScreen(
     var lastFocusedTab by rememberSaveable { mutableStateOf(HOME_TAB_INDEX) }
     var headerHasFocus by remember { mutableStateOf(false) }
     var webView by remember { mutableStateOf<WebView?>(null) }
+    var readyWebView by remember { mutableStateOf<WebView?>(null) }
     var canWebViewGoBack by remember { mutableStateOf(false) }
     var pendingContentFocusRoute by remember { mutableStateOf<TvRoute?>(null) }
     var pendingTabFocusIndex by remember { mutableStateOf<Int?>(null) }
@@ -126,6 +130,7 @@ fun DangJianTvScreen(
         pendingTabFocusIndex = if (moveFocusToContent) null else tabIndex
         if (targetRoute != currentRoute) {
             webView = null
+            readyWebView = null
             replaceRoute(targetRoute)
         }
         pendingContentFocusRoute = if (moveFocusToContent) targetRoute else null
@@ -238,8 +243,11 @@ fun DangJianTvScreen(
         }
     }
 
-    LaunchedEffect(currentRoute, pendingContentFocusRoute, webView) {
+    LaunchedEffect(currentRoute) {
         canWebViewGoBack = false
+    }
+
+    LaunchedEffect(currentRoute, pendingContentFocusRoute, webView, readyWebView) {
         if (pendingContentFocusRoute == currentRoute) {
             when (currentRoute) {
                 HomeRoute -> {
@@ -249,15 +257,16 @@ fun DangJianTvScreen(
                 }
 
                 is WebRoute -> {
-                    webView?.let { currentWebView ->
+                    webView?.takeIf { it === readyWebView }?.let { currentWebView ->
                         withFrameNanos { }
-                        currentWebView.post {
-                            currentWebView.requestFocus(View.FOCUS_DOWN)
-                            currentWebView.dispatchKeyEvent(
-                                KeyEvent(KeyEvent.ACTION_DOWN, KeyEvent.KEYCODE_DPAD_DOWN),
-                            )
-                            currentWebView.dispatchKeyEvent(
-                                KeyEvent(KeyEvent.ACTION_UP, KeyEvent.KEYCODE_DPAD_DOWN),
+                        if (pendingContentFocusRoute == currentRoute &&
+                            webView === currentWebView &&
+                            readyWebView === currentWebView
+                        ) {
+                            currentWebView.requestFocus()
+                            currentWebView.evaluateJavascript(
+                                CLEAR_WEB_DOM_FOCUS_SCRIPT,
+                                null,
                             )
                             pendingContentFocusRoute = null
                         }
@@ -328,12 +337,22 @@ fun DangJianTvScreen(
                     entry<WebRoute> { route ->
                         WebContent(
                             url = route.url,
-                            active = currentRoute == route,
+                            active = currentRoute == route && publicHelpRequest == null,
                             onCreated = { createdView ->
                                 if (currentRoute == route) webView = createdView
                             },
+                            onPageReadyChanged = { changedView, ready ->
+                                if (currentRoute == route) {
+                                    if (ready) {
+                                        readyWebView = changedView
+                                    } else if (readyWebView === changedView) {
+                                        readyWebView = null
+                                    }
+                                }
+                            },
                             onReleased = { releasedView ->
                                 if (webView === releasedView) webView = null
+                                if (readyWebView === releasedView) readyWebView = null
                             },
                             onCanGoBackChanged = { canGoBack ->
                                 if (currentRoute == route) canWebViewGoBack = canGoBack

@@ -2,6 +2,7 @@ package com.fpa.dangjiandaping.ui.web
 
 import android.annotation.SuppressLint
 import android.graphics.Color
+import android.os.Build
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
@@ -128,21 +129,14 @@ internal fun WebViewDialog(
                         object : WebView(context) {
                             override fun dispatchKeyEvent(event: KeyEvent): Boolean {
                                 if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                                    if (event.action == KeyEvent.ACTION_DOWN &&
-                                        event.repeatCount == 0
-                                    ) {
-                                        val atTop =
-                                            scrollY <= 0 || !canScrollVertically(-1)
-                                        if (atTop) {
+                                    if (event.action == KeyEvent.ACTION_DOWN) {
+                                        if (canScrollVertically(-1)) {
+                                            scrollBy(0, -scrollStepPx)
+                                        } else if (event.repeatCount == 0) {
                                             isFocusable = false
                                             isFocusableInTouchMode = false
                                             clearFocus()
                                             closeFocusRequestTrigger++
-                                        } else {
-                                            scrollTo(
-                                                0,
-                                                (scrollY - scrollStepPx).coerceAtLeast(0),
-                                            )
                                         }
                                     }
                                     // Consume DOWN and UP before WebView/HTML handles them.
@@ -150,7 +144,6 @@ internal fun WebViewDialog(
                                 }
                                 if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
                                     if (event.action == KeyEvent.ACTION_DOWN &&
-                                        event.repeatCount == 0 &&
                                         canScrollVertically(1)
                                     ) {
                                         scrollBy(0, scrollStepPx)
@@ -161,6 +154,9 @@ internal fun WebViewDialog(
                             }
                         }.apply {
                             webViewHolder[0] = this
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                defaultFocusHighlightEnabled = false
+                            }
 
                             layoutParams = ViewGroup.LayoutParams(
                                 ViewGroup.LayoutParams.MATCH_PARENT,

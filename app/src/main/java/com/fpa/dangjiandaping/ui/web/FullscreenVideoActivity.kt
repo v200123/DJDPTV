@@ -70,6 +70,7 @@ import com.shuyu.gsyvideoplayer.compose.native_.GSYPlayState
 import com.shuyu.gsyvideoplayer.compose.native_.GSYPlayerSurface
 import com.shuyu.gsyvideoplayer.compose.native_.rememberGSYPlayerController
 import com.shuyu.gsyvideoplayer.player.PlayerFactory
+import com.shuyu.gsyvideoplayer.video.base.GSYVideoView
 import tv.danmaku.ijk.media.exo2.Exo2PlayerManager
 
 /** Fullscreen video player opened from the WebView JavaScript bridge. */
@@ -155,6 +156,7 @@ private fun FullscreenVideoPlayer(
     val seekFocusRequester = remember { FocusRequester() }
     val exitFocusRequester = remember { FocusRequester() }
     var exiting by remember { mutableStateOf(false) }
+    var resumeAfterLifecyclePause by remember(controller) { mutableStateOf(true) }
 
     val exitPlayer = {
         if (!exiting) {
@@ -177,8 +179,30 @@ private fun FullscreenVideoPlayer(
     DisposableEffect(lifecycleOwner, controller) {
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
-                Lifecycle.Event.ON_PAUSE -> controller.pause()
-                Lifecycle.Event.ON_RESUME -> controller.resume()
+                Lifecycle.Event.ON_PAUSE -> {
+                    resumeAfterLifecyclePause = when (controller.withHost { it.currentState }) {
+                        GSYVideoView.CURRENT_STATE_PREPAREING,
+                        GSYVideoView.CURRENT_STATE_PLAYING,
+                        GSYVideoView.CURRENT_STATE_PLAYING_BUFFERING_START,
+                        -> true
+                        else -> false
+                    }
+                    controller.setStartAfterPrepared(false)
+                    controller.pause()
+                }
+                Lifecycle.Event.ON_RESUME -> {
+                    controller.setStartAfterPrepared(resumeAfterLifecyclePause)
+                    if (resumeAfterLifecyclePause) {
+                        when (controller.withHost { it.currentState }) {
+                            GSYVideoView.CURRENT_STATE_PAUSE -> controller.resume()
+                            GSYVideoView.CURRENT_STATE_PREPAREING,
+                            GSYVideoView.CURRENT_STATE_PLAYING,
+                            GSYVideoView.CURRENT_STATE_PLAYING_BUFFERING_START,
+                            -> Unit
+                            else -> controller.play()
+                        }
+                    }
+                }
                 else -> Unit
             }
         }
