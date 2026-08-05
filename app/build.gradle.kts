@@ -15,8 +15,8 @@ android {
         applicationId = "com.fpa.dangjiandaping"
         minSdk = 23
         targetSdk = 33
-        versionCode = 204
-        versionName = "2.0.4"
+        versionCode = 205
+        versionName = "2.0.5"
     }
 
     buildFeatures {
