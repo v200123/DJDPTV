@@ -92,9 +92,9 @@ import java.net.URL
 private const val DEFAULT_HOME_VIDEO_URL = "https://vod.scycjy.gov.cn/20260729/eE9NUYRQ/2000kb/hls/index.m3u8"
 private const val PARTY_PIONEER_MOBILE_URL = "https://12371.people.com.cn/"
 private const val PARTY_MEMBER_LEARNING_URL = "https://www.scycjy.gov.cn/dyxx_mys.html"
-private const val KANGBA_PARTY_FLAG_URL = "https://www.xyxf.gov.cn/#/index/subordinate/kbdqh"
+private const val KANGBA_PARTY_FLAG_URL = "http://dangjian-app.people.cn/"
 private const val CADRE_APPOINTMENT_URL =
-    "https://www.xyxf.gov.cn/#/index/details?id=2076661290549506050&name=%E5%B9%B2%E9%83%A8%E4%BB%BB%E5%85%8D%E5%85%AC%E7%A4%BA"
+    "http://renshi.people.com.cn/n1/2026/0811/c139617-40777396.html"
 
 private val Gold = Color(0xFFFFD889)
 private val BrightGold = Color(0xFFFFD186)
@@ -128,8 +128,8 @@ internal val defaultPartyStats = listOf(
 private data class CadreTask(val name: String, val duty: String, val date: String)
 
 private val cadreTasks = listOf(
-    CadreTask("李尚谦", "拟任正县级领导职务", "2026-07-13"),
-    CadreTask("祁光清", "拟任县（市）党委副书记", "2026-07-13"),
+    CadreTask("蒋玮", "拟任中国老龄协会会长", "2026-08-11"),
+    CadreTask("罗文", "免去国家市场监督管理总局局长", "2026-08-11"),
     CadreTask("曲几扎波", "拟任副县级领导职务", "2026-06-12"),
 )
 
@@ -365,10 +365,10 @@ private fun NewsTicker(
             SpeakerIcon(Modifier.size(24.dp))
             Spacer(Modifier.width(12.dp))
             TickerItem(
-                text = "丹巴县：依托教育人才“组团式”帮扶推动高中教育提质增效",
+                text = "中国海军红河舰与印尼海军“莱”号护卫舰位台岛以东海域圆满完成通航演练",
                 onClick = {
                     onOpenUrl(
-                        "https://www.xyxf.gov.cn/#/index/details?id=2080461005451776002&name=%E5%B7%A5%E4%BD%9C%E5%8A%A8%E6%80%81",
+                        "http://www.dangjian.cn/djyw/2026/08/13/detail_202608137836254.html",
                     )
                 },
                 modifier = Modifier.weight(1f),
@@ -377,21 +377,21 @@ private fun NewsTicker(
             )
             TickerDivider()
             TickerItem(
-                text = "九龙县：“三线共进”推动流动党员经常性教育管理提质增效",
+                text = "各部门协同联动、担当作为  坚持系统观念 夯实防灾能力",
                 modifier = Modifier.weight(1.2f),
                 onClick = {
                     onOpenUrl(
-                        "https://www.xyxf.gov.cn/#/index/details?id=2080460616023232513&name=%E5%B7%A5%E4%BD%9C%E5%8A%A8%E6%80%81",
+                        "http://www.dangjian.cn/djyw/2026/08/13/detail_202608137836252.html",
                     )
                 },
             )
             TickerDivider()
             TickerItem(
-                text = "道孚县：党建之花开出振兴硕果",
+                text = "我国脑机接口强脑技术取得突破",
                 modifier = Modifier.weight(0.82f),
                 onClick = {
                     onOpenUrl(
-                        "https://www.xyxf.gov.cn/#/index/details?id=2080459428695461890&name=%E5%B7%A5%E4%BD%9C%E5%8A%A8%E6%80%81",
+                        "http://www.dangjian.cn/djyw/2026/08/13/detail_202608137836251.html",
                     )
                 },
             )
@@ -1211,7 +1211,7 @@ private fun CoursewarePanel(
                     modifier = Modifier
                         .weight(1f)
                         .focusProperties { up = cadreAppointmentFocusRequester },
-            image = R.drawable.ic_home_kejian_03,
+            image = R.drawable.ic_home_kejian_04,
             onClick = { onCoursewareClick(3) },
             )
 

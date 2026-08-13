@@ -8,6 +8,7 @@ import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.webkit.WebChromeClient
+import android.webkit.WebResourceRequest
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -55,6 +56,19 @@ private const val SCALE_WIDE_PAGE_SCRIPT =
         "root.style.zoom=overflow?'0.7':'';" +
         "return overflow;" +
         "})();"
+
+private const val DANGJIAN_MOBILE_USER_AGENT =
+    "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 " +
+        "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
+
+private fun userAgentFor(url: String): String {
+    val host = android.net.Uri.parse(url).host?.lowercase().orEmpty()
+    return if (host.contains( "www.dangjian.cn" )) {
+        DANGJIAN_MOBILE_USER_AGENT
+    } else {
+        MOBILE_BROWSER_USER_AGENT
+    }
+}
 
 /**
  * WebView 弹窗。
@@ -172,6 +186,16 @@ internal fun WebViewDialog(
                                 false
                             }
                             webViewClient = object : WebViewClient() {
+                                override fun shouldOverrideUrlLoading(
+                                    view: WebView,
+                                    request: WebResourceRequest,
+                                ): Boolean {
+                                    if (request.isForMainFrame) {
+                                        view.settings.userAgentString = userAgentFor(request.url.toString())
+                                    }
+                                    return false
+                                }
+
                                 override fun onPageFinished(view: WebView, url: String?) {
                                     super.onPageFinished(view, url)
                                     // Some pages finish laying out shortly after onPageFinished.
@@ -197,7 +221,7 @@ internal fun WebViewDialog(
                                 mediaPlaybackRequiresUserGesture = false
                                 mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
                                 cacheMode = WebSettings.LOAD_DEFAULT
-                                userAgentString = MOBILE_BROWSER_USER_AGENT
+                                userAgentString = userAgentFor(url)
                                 useWideViewPort = true
                                 loadWithOverviewMode = true
                                 builtInZoomControls = false
@@ -215,6 +239,7 @@ internal fun WebViewDialog(
                         if (webView.tag != url) {
                             pageTitle = "网页详情"
                             webView.tag = url
+                            webView.settings.userAgentString = userAgentFor(url)
                             webView.loadUrl(url)
                         }
                     },

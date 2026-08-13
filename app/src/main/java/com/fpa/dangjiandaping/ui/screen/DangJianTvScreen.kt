@@ -70,8 +70,8 @@ import kotlinx.coroutines.delay
 import kotlin.random.Random
 
 private const val HOME_TAB_INDEX = 0
-private const val MOCK_HELP_MIN_DELAY_MILLIS = 5_000L
-private const val MOCK_HELP_MAX_DELAY_MILLIS = 12_001L
+private const val MOCK_HELP_MIN_DELAY_MILLIS = 15_000L
+private const val MOCK_HELP_MAX_DELAY_MILLIS = 32_000L
 private const val CLEAR_WEB_DOM_FOCUS_SCRIPT =
     "(function(){var el=document.activeElement;" +
         "if(el&&el!==document.body&&el!==document.documentElement&&" +
@@ -150,20 +150,20 @@ fun DangJianTvScreen(
 
     fun openPartyBuilding(channelId: Int) {
         activateRoute(
-            tabIndex = 6,
+            tabIndex = 4,
             targetRoute = partyBuildingRoute(channelId),
             moveFocusToContent = false,
         )
-        pendingTabFocusIndex = 6
+        pendingTabFocusIndex = 4
     }
 
     fun openCourseware(type: Int) {
         activateRoute(
-            tabIndex = 5,
+            tabIndex = 3,
             targetRoute = coursewareRoute(type),
             moveFocusToContent = false,
         )
-        pendingTabFocusIndex = 5
+        pendingTabFocusIndex = 3
     }
 
     fun handleBack() {

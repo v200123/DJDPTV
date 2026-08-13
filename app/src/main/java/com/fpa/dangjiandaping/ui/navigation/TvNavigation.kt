@@ -40,7 +40,7 @@ internal fun TvTabDestination.toRoute(tabIndex: Int): TvRoute = when (this) {
 }
 
 internal fun partyBuildingRoute(channelId: Int): WebRoute = WebRoute(
-    tabIndex = 6,
+    tabIndex = 4,
     url = "$jicengdangjian_URL?id=$channelId",
 )
 
