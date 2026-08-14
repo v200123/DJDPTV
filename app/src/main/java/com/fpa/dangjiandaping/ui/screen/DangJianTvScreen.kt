@@ -158,6 +158,9 @@ fun DangJianTvScreen(
     }
 
     fun openCourseware(type: Int) {
+        // Keep the header's visual state aligned with the courseware route even if
+        // Compose temporarily restores focus to the disposed HomeScreen entry.
+        lastFocusedTab = 3
         activateRoute(
             tabIndex = 3,
             targetRoute = coursewareRoute(type),
@@ -212,20 +215,20 @@ fun DangJianTvScreen(
         }
     }
 
-    LaunchedEffect(Unit) {
-        if (isInPreview || mockPublicHelpRequests.isEmpty()) return@LaunchedEffect
-
-        delay(
-            Random.nextLong(
-                from = MOCK_HELP_MIN_DELAY_MILLIS,
-                until = MOCK_HELP_MAX_DELAY_MILLIS,
-            ),
-        )
-        while (publicHelpRequest != null) {
-            delay(1_000L)
-        }
-        publicHelpRequest = mockPublicHelpRequests.random()
-    }
+//    LaunchedEffect(Unit) {
+//        if (isInPreview || mockPublicHelpRequests.isEmpty()) return@LaunchedEffect
+//
+//        delay(
+//            Random.nextLong(
+//                from = MOCK_HELP_MIN_DELAY_MILLIS,
+//                until = MOCK_HELP_MAX_DELAY_MILLIS,
+//            ),
+//        )
+//        while (publicHelpRequest != null) {
+//            delay(1_000L)
+//        }
+//        publicHelpRequest = mockPublicHelpRequests.random()
+//    }
 
     LaunchedEffect(manualHelpTrigger) {
         if (isInPreview || manualHelpTrigger <= 0 || mockPublicHelpRequests.isEmpty()) {
@@ -292,11 +295,10 @@ fun DangJianTvScreen(
                 focusedTab = lastFocusedTab,
                 tabFocusRequesters = tabFocusRequesters,
                 onTabFocused = { tabIndex ->
-                    if (pendingContentFocusRoute != null ||
-                        pendingTabFocusIndex != null ||
-                        tabIndex == selectedTab
-                    ) {
+                    if (pendingContentFocusRoute != null || tabIndex == selectedTab) {
                         lastFocusedTab = tabIndex
+                    } else if (pendingTabFocusIndex != null) {
+                        // Ignore transient focus restoration while the route is being replaced.
                     } else {
                         activateTab(tabIndex, moveFocusToContent = false)
                     }

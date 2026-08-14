@@ -108,7 +108,7 @@ private fun HeaderBrandRow(modifier: Modifier = Modifier) {
         Image(painterResource(R.drawable.ic_app_left_logo), contentScale = ContentScale.Fit, contentDescription = "",
             modifier = Modifier.align(Alignment.TopStart))
         Column(horizontalAlignment = Alignment.End, modifier = Modifier.offset(0.dp,10.dp)) {
-            Text("中共省委组织部", color = Color(0xFFFFD186), fontSize = 12.sp)
+            Text("中共xxxx党支部", color = Color(0xFFFFD186), fontSize = 12.sp)
             Text(currentDateText(), color = Color(0xFFFFD186), fontSize = 10.sp)
         }
     }
@@ -144,7 +144,8 @@ private fun HeaderTabRow(
     ) {
         TV_TABS.forEachIndexed { index, tab ->
             val focused = tabRowHasFocus && focusedTab == index
-            val retainedFocus = !tabRowHasFocus && focusedTab == index
+            // Retain the route selection once focus moves into the content area.
+            val retainedFocus = !tabRowHasFocus && selectedTab == index
             Box(
                 modifier = Modifier
                     .focusRequester(tabFocusRequesters[index])

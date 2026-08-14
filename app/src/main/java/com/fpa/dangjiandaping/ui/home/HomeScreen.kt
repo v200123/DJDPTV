@@ -89,7 +89,7 @@ import org.json.JSONObject
 import java.net.HttpURLConnection
 import java.net.URL
 
-private const val DEFAULT_HOME_VIDEO_URL = "https://vod.scycjy.gov.cn/20260729/eE9NUYRQ/2000kb/hls/index.m3u8"
+private const val DEFAULT_HOME_VIDEO_URL = "https://www.cdlhyj.com/web/html/video/wsp/Example_10_Leng_Xiaokun_Making_Chinese_Robots_Serve_Production_and_Life.mp4"
 private const val PARTY_PIONEER_MOBILE_URL = "https://12371.people.com.cn/"
 private const val PARTY_MEMBER_LEARNING_URL = "https://www.scycjy.gov.cn/dyxx_mys.html"
 private const val KANGBA_PARTY_FLAG_URL = "http://dangjian-app.people.cn/"
@@ -365,10 +365,10 @@ private fun NewsTicker(
             SpeakerIcon(Modifier.size(24.dp))
             Spacer(Modifier.width(12.dp))
             TickerItem(
-                text = "中国海军红河舰与印尼海军“莱”号护卫舰位台岛以东海域圆满完成通航演练",
+                text = "张道平会见中国电信四川公司党委书记、总经理马杉",
                 onClick = {
                     onOpenUrl(
-                        "http://www.dangjian.cn/djyw/2026/08/13/detail_202608137836254.html",
+                        "https://www.scmstv.cn/#/detail2?id=2087856780067573761&source=%E4%B9%A6%E8%AE%B0%E5%8A%A8%E6%80%81&sPath=%2Fmingsheng&isAutoRoute=true&isFromLanmu=false&type=1",
                     )
                 },
                 modifier = Modifier.weight(1f),
@@ -377,21 +377,21 @@ private fun NewsTicker(
             )
             TickerDivider()
             TickerItem(
-                text = "各部门协同联动、担当作为  坚持系统观念 夯实防灾能力",
+                text = "张道平在基层一线调研慰问时强调：扎实抓好防汛抗旱度夏保供工作 确保人民群众生命财产安全生产生活有序",
                 modifier = Modifier.weight(1.2f),
                 onClick = {
                     onOpenUrl(
-                        "http://www.dangjian.cn/djyw/2026/08/13/detail_202608137836252.html",
+                        "https://www.scmstv.cn/#/detail2?id=2087112195331764226&source=%E4%B9%A6%E8%AE%B0%E5%8A%A8%E6%80%81&sPath=%2Fmingsheng&isAutoRoute=true&isFromLanmu=false&type=1",
                     )
                 },
             )
             TickerDivider()
             TickerItem(
-                text = "我国脑机接口强脑技术取得突破",
+                text = "张道平前往部分市级部门走访调研时强调：锚定目标锻长补短加力攻坚 奋力推动经济持续向新向优向好发展",
                 modifier = Modifier.weight(0.82f),
                 onClick = {
                     onOpenUrl(
-                        "http://www.dangjian.cn/djyw/2026/08/13/detail_202608137836251.html",
+                        "https://www.scmstv.cn/#/detail2?id=2086773237041926145&source=%E4%B9%A6%E8%AE%B0%E5%8A%A8%E6%80%81&sPath=%2Fmingsheng&isAutoRoute=true&isFromLanmu=false&type=1",
                     )
                 },
             )
