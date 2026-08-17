@@ -1,20 +1,19 @@
 package com.fpa.dangjiandaping.ui.navigation
 
 import androidx.navigation3.runtime.NavKey
+import com.fpa.dangjiandaping.BuildConfig
 import kotlinx.serialization.Serializable
 
-private const val BASE_URL = "http://192.168.20.233:5173/xiaoyuTv/#/"
-//private const val BASE_URL = "http://192.168.20.118:5173/xiaoyuTv/#/"
-//private const val BASE_URL = "https://www.scycjy.gov.cn/xiaoyuTv/#/"
+private val BASE_URL = BuildConfig.BASE_URL
 
-private const val HOME_WEB_URL = "$BASE_URL"
-private const val PARTY_MEMBER_URL = "${BASE_URL}find-party-member"
-private const val kangba_URL = "${BASE_URL}kangba"
-private const val teacher_URL = "${BASE_URL}teacher"
-private const val NAV_BASE_URL = "${BASE_URL}base"
-private const val courseware_URL = "${BASE_URL}courseware"
-private const val jicengdangjian_URL = "${BASE_URL}basic-party-building"
-private const val party_URL = "${BASE_URL}party"
+private val HOME_WEB_URL = BASE_URL
+private val PARTY_MEMBER_URL = "${BASE_URL}find-party-member"
+private val kangba_URL = "${BASE_URL}kangba"
+private val teacher_URL = "${BASE_URL}teacher"
+private val NAV_BASE_URL = "${BASE_URL}base"
+private val courseware_URL = "${BASE_URL}courseware"
+private val jicengdangjian_URL = "${BASE_URL}basic-party-building"
+private val party_URL = "${BASE_URL}party"
 
 internal sealed interface TvTabDestination {
     data object NativeHome : TvTabDestination

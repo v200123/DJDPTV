@@ -24,6 +24,18 @@ android {
         buildConfig = true
     }
 
+    buildTypes {
+        debug {
+            // 开发/测试包只能访问测试环境，避免调试时误操作正式数据。
+            buildConfigField("String", "BASE_URL", "\"http://192.168.20.233:5173/xiaoyuTv/#/\"")
+        }
+        release {
+            // 正式签名包固定访问正式环境。
+            buildConfigField("String", "BASE_URL", "\"https://www.scycjy.gov.cn/xiaoyuTv/#/\"")
+            signingConfig = signingConfigs.getByName("debug")
+        }
+    }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17

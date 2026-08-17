@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -50,13 +51,19 @@ private const val WEB_LOG_TAG = "WebContent"
 private const val CAPTURE_WEB_FOCUS_SCRIPT =
     "(function(){var old=document.querySelector('[data-android-focus-return]');" +
         "if(old){old.removeAttribute('data-android-focus-return');}" +
-        "var el=document.activeElement;" +
+        // vue-tv-focusable (used by the H5 pages) keeps remote focus in this attribute;
+        // document.activeElement normally remains BODY for its focusable DIVs.
+        "var el=document.querySelector('[focused]')||document.activeElement;" +
         "if(el&&el!==document.body&&el!==document.documentElement){" +
         "el.setAttribute('data-android-focus-return','true');window.__androidFocusReturnElement=el;}})();"
 private const val RESTORE_WEB_FOCUS_SCRIPT =
     "(function(){var el=window.__androidFocusReturnElement||" +
         "document.querySelector('[data-android-focus-return]');" +
         "if(el&&document.documentElement.contains(el)){" +
+        "var current=document.querySelector('[focused]');" +
+        "if(current&&current!==el){current.removeAttribute('focused');" +
+        "current.classList.remove('focus');}" +
+        "el.setAttribute('focused','');el.classList.add('focus');" +
         "try{el.focus({preventScroll:true});}catch(e){el.focus();}" +
         "try{el.scrollIntoView({block:'nearest',inline:'nearest'});}catch(e){}" +
         "return true;}return false;})();"
@@ -134,7 +141,9 @@ private class WebFocusBridge(
     fun playVideo(videoUrl: String?,title:String?) {
         Log.d(WEB_LOG_TAG, "H5 called playVideo: $videoUrl")
         webView.post {
-            onPlayVideo(videoUrl?.trim()?:"",title?:"")
+            // The H5 focusable library owns and retains its selected item. Do not mutate
+            // that state when entering fullscreen; the native layer only restores WebView focus.
+            onPlayVideo(videoUrl?.trim() ?: "", title ?: "")
         }
     }
 
@@ -175,6 +184,8 @@ internal fun WebContent(
     var webViewDialogUrl by remember(url) { mutableStateOf<String?>(null) }
     var restoreNewsDetailFocus by remember(url) { mutableStateOf(false) }
     var restoreServiceTeamFocus by remember(url) { mutableStateOf(false) }
+    var restoreVideoFocus by remember(url) { mutableStateOf(false) }
+    var videoActivityPausedHost by remember(url) { mutableStateOf(false) }
     val webViewHolder = remember { arrayOfNulls<WebView>(1) }
     val lifecycleOwner = LocalLifecycleOwner.current
     var appInForeground by remember(lifecycleOwner) {
@@ -185,7 +196,10 @@ internal fun WebContent(
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> appInForeground = true
-                Lifecycle.Event.ON_PAUSE -> appInForeground = false
+                Lifecycle.Event.ON_PAUSE -> {
+                    appInForeground = false
+                    if (restoreVideoFocus) videoActivityPausedHost = true
+                }
                 else -> Unit
             }
         }
@@ -218,6 +232,22 @@ internal fun WebContent(
                 }
             }
             restoreServiceTeamFocus = false
+        }
+    }
+
+    LaunchedEffect(appInForeground, restoreVideoFocus, videoActivityPausedHost) {
+        if (appInForeground && restoreVideoFocus && videoActivityPausedHost) {
+            // FullscreenVideoActivity is a separate Activity. Wait until its window has fully
+            // gone away before handing both native and DOM focus back to the originating item.
+            withFrameNanos { }
+            webViewHolder[0]?.let { webView ->
+                webView.isFocusable = true
+                webView.isFocusableInTouchMode = true
+                webView.requestFocus()
+                Log.d(FOCUS_LOG_TAG, "Fullscreen video returned -> WebView native focus restored")
+            }
+            restoreVideoFocus = false
+            videoActivityPausedHost = false
         }
     }
 
@@ -313,6 +343,8 @@ internal fun WebContent(
                                 },
                                 onPlayVideo = { requestedUrl,title ->
                                     if (requestedUrl.isNotEmpty()) {
+                                        restoreVideoFocus = true
+                                        videoActivityPausedHost = false
                                         context.startActivity(
                                             FullscreenVideoActivity.newIntent(
                                                 context = context,

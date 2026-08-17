@@ -365,10 +365,10 @@ private fun NewsTicker(
             SpeakerIcon(Modifier.size(24.dp))
             Spacer(Modifier.width(12.dp))
             TickerItem(
-                text = "张道平会见中国电信四川公司党委书记、总经理马杉",
+                text = "《国家综合气象观测系统建设“十五五”规划》印发",
                 onClick = {
                     onOpenUrl(
-                        "https://www.scmstv.cn/#/detail2?id=2087856780067573761&source=%E4%B9%A6%E8%AE%B0%E5%8A%A8%E6%80%81&sPath=%2Fmingsheng&isAutoRoute=true&isFromLanmu=false&type=1",
+                        "https://www.sc.gov.cn/10462/13241/2026/8/13/cf303f8b63be4eac97bf197d8cee3c5f.shtml",
                     )
                 },
                 modifier = Modifier.weight(1f),
