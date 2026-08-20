@@ -66,7 +66,12 @@ import com.fpa.dangjiandaping.ui.web.PublicHelpRequest
 import com.fpa.dangjiandaping.ui.web.PublicHelpRequestDialog
 import com.fpa.dangjiandaping.ui.web.WebContent
 import com.fpa.dangjiandaping.ui.web.mockPublicHelpRequests
+import com.fpa.dangjiandaping.ui.update.AppUpdate
+import com.fpa.dangjiandaping.ui.update.AppUpdateDialog
+import com.fpa.dangjiandaping.ui.update.BetaQrUpdateManager
+import com.fpa.dangjiandaping.ui.update.DownloadProgress
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import kotlin.random.Random
 
 private const val HOME_TAB_INDEX = 0
@@ -98,6 +103,10 @@ fun DangJianTvScreen(
     var pendingTabFocusIndex by remember { mutableStateOf<Int?>(null) }
     var partyStats by remember { mutableStateOf(defaultPartyStats) }
     var publicHelpRequest by remember { mutableStateOf<PublicHelpRequest?>(null) }
+    var availableUpdate by remember { mutableStateOf<AppUpdate?>(null) }
+    var updateDownloadInProgress by remember { mutableStateOf(false) }
+    var updateDownloadError by remember { mutableStateOf<String?>(null) }
+    var updateDownloadProgress by remember { mutableStateOf<DownloadProgress?>(null) }
 
     val tabFocusRequesters = rememberTvTabFocusRequesters()
     val contentFocusRequester = remember { FocusRequester() }
@@ -105,6 +114,7 @@ fun DangJianTvScreen(
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
     val isInPreview = LocalInspectionMode.current
+    val updateScope = androidx.compose.runtime.rememberCoroutineScope()
 
     fun replaceRoute(route: TvRoute) {
         if (backStack.isEmpty()) {
@@ -212,6 +222,13 @@ fun DangJianTvScreen(
                     stat.copy(count = update.newsCount, channelId = update.channelId)
                 } ?: stat
             }
+        }
+    }
+
+    LaunchedEffect(isInPreview) {
+        if (!isInPreview) {
+            // A network/configuration failure must not interrupt the TV home screen.
+            availableUpdate = BetaQrUpdateManager.findUpdate(context).getOrNull()
         }
     }
 
@@ -327,7 +344,7 @@ fun DangJianTvScreen(
                 entryProvider = entryProvider<NavKey> {
                     entry<HomeRoute> {
                         HomeScreen(
-                            active = currentRoute == HomeRoute && publicHelpRequest == null,
+                            active = currentRoute == HomeRoute && publicHelpRequest == null && availableUpdate == null,
                             modifier = Modifier.fillMaxSize(),
                             partyStats = partyStats,
                             contentFocusRequester = contentFocusRequester,
@@ -339,7 +356,7 @@ fun DangJianTvScreen(
                     entry<WebRoute> { route ->
                         WebContent(
                             url = route.url,
-                            active = currentRoute == route && publicHelpRequest == null,
+                            active = currentRoute == route && publicHelpRequest == null && availableUpdate == null,
                             onCreated = { createdView ->
                                 if (currentRoute == route) webView = createdView
                             },
@@ -381,6 +398,31 @@ fun DangJianTvScreen(
                 onDismiss = { publicHelpRequest = null },
                 onHandled = { publicHelpRequest = null },
                 onContactLater = { publicHelpRequest = null },
+            )
+        }
+
+        availableUpdate?.let { update ->
+            AppUpdateDialog(
+                update = update,
+                downloading = updateDownloadInProgress,
+                downloadProgress = updateDownloadProgress,
+                errorMessage = updateDownloadError,
+                onDownload = {
+                    updateDownloadInProgress = true
+                    updateDownloadError = null
+                    updateDownloadProgress = DownloadProgress(0L, update.fileSizeBytes)
+                    updateScope.launch {
+                        BetaQrUpdateManager.downloadApk(update, context) { downloaded, total ->
+                            updateDownloadProgress = DownloadProgress(downloaded, total)
+                        }
+                            .onSuccess { apk -> BetaQrUpdateManager.installApk(context, apk) }
+                            .onFailure { error ->
+                                updateDownloadError = error.message ?: "下载失败，请稍后重试"
+                            }
+                        updateDownloadInProgress = false
+                    }
+                },
+                onDismiss = { availableUpdate = null },
             )
         }
     }

@@ -5,7 +5,24 @@ plugins {
     id("org.jetbrains.kotlin.plugin.serialization")
 }
 
+val betaQrAppId = providers.gradleProperty("BETAQR_APP_ID").orElse("").get()
+val betaQrApiToken = providers.gradleProperty("BETAQR_API_TOKEN").orElse("").get()
+
 android {
+    signingConfigs {
+        getByName("debug") {
+            storeFile = file("D:\\AiProject\\djdptv\\app\\djtv_putong")
+            storePassword = "123456"
+            keyAlias = "key0"
+            keyPassword = "123456"
+        }
+//        getByName("release") {
+//            storeFile = file("D:\\AiProject\\djdptv\\app\\djtv_putong")
+//            storePassword = "123456"
+//            keyAlias = "key0"
+//            keyPassword = "123456"
+//        }
+    }
     namespace = "com.fpa.dangjiandaping"
     compileSdk = 36
     lint {
@@ -17,6 +34,9 @@ android {
         targetSdk = 33
         versionCode = 205
         versionName = "2.0.5"
+        // Configure these in the user Gradle properties; do not commit the API token.
+        buildConfigField("String", "BETAQR_APP_ID", "\"6a841a5cf9454870f3a5a87a\"")
+        buildConfigField("String", "BETAQR_API_TOKEN", "\"fc06ee35435bb4b74a7603bf2190a198\"")
     }
 
     buildFeatures {
