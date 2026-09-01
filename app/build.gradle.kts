@@ -8,15 +8,30 @@ plugins {
 android {
     namespace = "com.fpa.dangjiandaping"
     compileSdk = 36
-    lint {
-        baseline = file("lint-baseline.xml")
-    }
     defaultConfig {
         applicationId = "com.fpa.dangjiandaping"
         minSdk = 23
         targetSdk = 33
         versionCode = 205
         versionName = "2.0.5"
+    }
+
+    buildTypes {
+        debug {
+            buildConfigField(
+                "String",
+                "BASE_URL",
+                "\"http://192.168.20.233:5173/ganziTv/#/\""
+            )
+        }
+        release {
+            buildConfigField(
+                "String",
+                "BASE_URL",
+                "\"https://www.scycjy.gov.cn/ganziTv/#/\""
+            )
+            signingConfig = signingConfigs.getByName("debug")
+        }
     }
 
     buildFeatures {

@@ -337,10 +337,23 @@ private fun PlayerControlButton(
                 color = if (focused) Color(0xFFFFD889) else Color(0x80FFFFFF),
                 shape = shape,
             )
+            .onPreviewKeyEvent { event ->
+                if (event.type == KeyEventType.KeyDown &&
+                    event.key in setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
+                ) {
+                    onClick()
+                    true
+                } else {
+                    false
+                }
+            }
             .clickable {
                 focusRequester.requestFocus()
                 onClick()
             }
+            // Keep the focus target after `clickable`: then the focused node's
+            // DPAD_CENTER/Enter activation is handled by `clickable` as well.
+            .focusable()
             .padding(horizontal = 24.dp, vertical = 12.dp),
         contentAlignment = Alignment.Center,
     ) {
