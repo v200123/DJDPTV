@@ -52,6 +52,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.Text
 import androidx.tv.material3.MaterialTheme
+import com.fpa.dangjiandaping.ui.focus.logFocusTarget
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -312,6 +313,7 @@ private fun ServiceTeamDialogContent(team: ServiceTeam, onDismiss: () -> Unit) {
                     .fillMaxWidth()
                     .fillMaxHeight()
                     .focusRequester(contentFocusRequester)
+                    .logFocusTarget("ServiceTeam.Content")
                     .focusable(),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {

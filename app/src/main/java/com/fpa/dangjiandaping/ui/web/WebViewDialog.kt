@@ -7,6 +7,7 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.WindowManager
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
@@ -17,7 +18,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -40,8 +40,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import androidx.compose.ui.window.DialogWindowProvider
 import androidx.tv.material3.Text
 
 private const val SCALE_WIDE_PAGE_SCRIPT =
@@ -80,17 +82,22 @@ internal fun WebViewDialog(
             usePlatformDefaultWidth = false,
         ),
     ) {
+        // Compose Dialog adds a platform dim-behind scrim independently of its
+        // content. Clear it as well as leaving the full-screen host transparent.
+        val dialogWindow = (LocalView.current.parent as? DialogWindowProvider)?.window
+        LaunchedEffect(dialogWindow) {
+            dialogWindow?.clearFlags(WindowManager.LayoutParams.FLAG_DIM_BEHIND)
+            dialogWindow?.setDimAmount(0f)
+        }
+
         Box(
             modifier = Modifier
-                .fillMaxSize()
-                .background(HelpDialogScrim)
-                .padding(horizontal = 42.dp, vertical = 28.dp),
+                .fillMaxSize(),
             contentAlignment = Alignment.Center,
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .fillMaxHeight()
+                    .fillMaxSize(0.75f)
                     .tvDialogPanel(RoundedCornerShape(12.dp))
                     .padding(horizontal = 24.dp, vertical = 20.dp),
             ) {

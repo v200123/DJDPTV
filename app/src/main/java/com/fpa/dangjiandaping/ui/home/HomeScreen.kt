@@ -78,6 +78,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.fpa.dangjiandaping.R
 import com.fpa.dangjiandaping.ui.focus.focusOnClick
+import com.fpa.dangjiandaping.ui.focus.logFocusTarget
 import com.fpa.dangjiandaping.ui.web.WebViewDialog
 import com.shuyu.gsyvideoplayer.compose.native_.GSYPlayState
 import com.shuyu.gsyvideoplayer.compose.native_.GSYPlayerSurface
@@ -417,6 +418,7 @@ private fun TickerItem(
             .then(if (focused) Modifier.border(1.dp, PrimaryRed, shape) else Modifier)
             .onFocusChanged { focused = it.isFocused }
             .focusRequester(clickFocusRequester)
+            .logFocusTarget("Home.Ticker[$text]")
             .focusOnClick(clickFocusRequester)
             .then(
                 if (downFocusRequester != null) {
@@ -797,6 +799,7 @@ private fun SeekBar(
         modifier = modifier
             .height(24.dp)
             .focusRequester(clickFocusRequester)
+            .logFocusTarget("Home.VideoSeekBar")
             .focusOnClick(clickFocusRequester)
             .pointerInput(clickFocusRequester) {
                 detectTapGestures(
@@ -894,6 +897,7 @@ private fun FocusableAction(
             .then(if (focused) Modifier.border(2.dp, Gold, shape) else Modifier)
             .onFocusChanged { focused = it.isFocused }
             .focusRequester(clickFocusRequester)
+            .logFocusTarget("Home.Action")
             .focusOnClick(clickFocusRequester)
             .clickable {
                 clickFocusRequester.requestFocus()
@@ -1113,6 +1117,7 @@ private fun PartyPanelFocusableItem(
             .then(if (focused) Modifier.border(2.dp, Gold, shape) else Modifier)
             .onFocusChanged { focused = it.isFocused }
             .focusRequester(clickFocusRequester)
+            .logFocusTarget("Home.PartyPanelItem")
             .focusOnClick(clickFocusRequester)
             .clickable {
                 clickFocusRequester.requestFocus()
@@ -1305,6 +1310,7 @@ private fun FocusableTile(
             .then(if (focused) Modifier.border(3.dp, BrightGold, RoundedCornerShape(8.dp)) else Modifier)
             .onFocusChanged { focused = it.isFocused }
             .focusRequester(clickFocusRequester)
+            .logFocusTarget("Home.Tile")
             .focusOnClick(clickFocusRequester)
             .clickable {
                 clickFocusRequester.requestFocus()

@@ -25,6 +25,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -60,6 +61,11 @@ private const val RESTORE_WEB_FOCUS_SCRIPT =
         "try{el.focus({preventScroll:true});}catch(e){el.focus();}" +
         "try{el.scrollIntoView({block:'nearest',inline:'nearest'});}catch(e){}" +
         "return true;}return false;})();"
+private const val CLEAR_WEB_DOM_FOCUS_SCRIPT =
+    "(function(){var el=document.activeElement;" +
+        "if(el&&el!==document.body&&el!==document.documentElement&&" +
+        "typeof el.blur==='function'){el.blur();}" +
+        "return true;})();"
 
 private class WebFocusBridge(
     private val webView: WebView,
@@ -175,6 +181,9 @@ internal fun WebContent(
     var webViewDialogUrl by remember(url) { mutableStateOf<String?>(null) }
     var restoreNewsDetailFocus by remember(url) { mutableStateOf(false) }
     var restoreServiceTeamFocus by remember(url) { mutableStateOf(false) }
+    var restoreWebViewDialogFocus by remember(url) { mutableStateOf(false) }
+    var restoreVideoFocus by remember(url) { mutableStateOf(false) }
+    var videoActivityPausedHost by remember(url) { mutableStateOf(false) }
     val webViewHolder = remember { arrayOfNulls<WebView>(1) }
     val lifecycleOwner = LocalLifecycleOwner.current
     var appInForeground by remember(lifecycleOwner) {
@@ -185,7 +194,10 @@ internal fun WebContent(
         val observer = LifecycleEventObserver { _, event ->
             when (event) {
                 Lifecycle.Event.ON_RESUME -> appInForeground = true
-                Lifecycle.Event.ON_PAUSE -> appInForeground = false
+                Lifecycle.Event.ON_PAUSE -> {
+                    appInForeground = false
+                    if (restoreVideoFocus) videoActivityPausedHost = true
+                }
                 else -> Unit
             }
         }
@@ -218,6 +230,44 @@ internal fun WebContent(
                 }
             }
             restoreServiceTeamFocus = false
+        }
+    }
+
+    LaunchedEffect(webViewDialogUrl, restoreWebViewDialogFocus) {
+        if (webViewDialogUrl == null && restoreWebViewDialogFocus) {
+            // The dialog is removed during this recomposition. Match the tab re-entry path:
+            // return native focus, then clear only DOM's active element. The H5 visual focus
+            // remains available for DPAD navigation, but confirm cannot reactivate a stale link.
+            withFrameNanos { }
+            webViewHolder[0]?.let { webView ->
+                webView.isFocusable = true
+                webView.isFocusableInTouchMode = true
+                webView.requestFocus()
+                webView.evaluateJavascript(CLEAR_WEB_DOM_FOCUS_SCRIPT) { cleared ->
+                    Log.d(FOCUS_LOG_TAG, "WebView dialog dismissed -> DOM active element cleared=$cleared")
+                }
+                Log.d(FOCUS_LOG_TAG, "WebView dialog dismissed -> native WebView focus restored")
+            }
+            restoreWebViewDialogFocus = false
+        }
+    }
+
+    LaunchedEffect(appInForeground, restoreVideoFocus, videoActivityPausedHost) {
+        if (appInForeground && restoreVideoFocus && videoActivityPausedHost) {
+            // FullscreenVideoActivity owns a separate window. Restore Android focus after its
+            // window is gone and clear only DOM focus; do not alter H5 virtual selection.
+            withFrameNanos { }
+            webViewHolder[0]?.let { webView ->
+                webView.isFocusable = true
+                webView.isFocusableInTouchMode = true
+                webView.requestFocus()
+                webView.evaluateJavascript(CLEAR_WEB_DOM_FOCUS_SCRIPT) { cleared ->
+                    Log.d(FOCUS_LOG_TAG, "Fullscreen video returned -> DOM active element cleared=$cleared")
+                }
+                Log.d(FOCUS_LOG_TAG, "Fullscreen video returned -> native WebView focus restored")
+            }
+            restoreVideoFocus = false
+            videoActivityPausedHost = false
         }
     }
 
@@ -313,6 +363,8 @@ internal fun WebContent(
                                 },
                                 onPlayVideo = { requestedUrl,title ->
                                     if (requestedUrl.isNotEmpty()) {
+                                        restoreVideoFocus = true
+                                        videoActivityPausedHost = false
                                         context.startActivity(
                                             FullscreenVideoActivity.newIntent(
                                                 context = context,
@@ -506,7 +558,10 @@ internal fun WebContent(
         webViewDialogUrl?.let { requestedUrl ->
             WebViewDialog(
                 url = requestedUrl,
-                onDismiss = { webViewDialogUrl = null },
+                onDismiss = {
+                    webViewDialogUrl = null
+                    restoreWebViewDialogFocus = true
+                },
             )
         }
 

@@ -61,6 +61,7 @@ import androidx.compose.ui.window.DialogProperties
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.fpa.dangjiandaping.ui.focus.focusOnClick
+import com.fpa.dangjiandaping.ui.focus.logFocusTarget
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -485,6 +486,7 @@ private fun HelpRequestLeftColumn(
             )
             .onFocusChanged { focused = it.isFocused }
             .focusRequester(focusRequester)
+            .logFocusTarget("HelpRequest.Details")
             .focusProperties {
                 up = closeFocusRequester
                 down = handledFocusRequester
@@ -647,6 +649,7 @@ private fun HelpActionButton(
                 shape = shape,
             )
             .focusRequester(clickFocusRequester)
+            .logFocusTarget("HelpRequest.Action[$text]")
             .focusOnClick(clickFocusRequester)
             .clickable(role = Role.Button) {
                 clickFocusRequester.requestFocus()

@@ -57,6 +57,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.fpa.dangjiandaping.R
 import com.fpa.dangjiandaping.ui.focus.focusOnClick
+import com.fpa.dangjiandaping.ui.focus.logFocusTarget
 import com.fpa.dangjiandaping.ui.navigation.TV_TABS
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -148,6 +149,7 @@ private fun HeaderTabRow(
             Box(
                 modifier = Modifier
                     .focusRequester(tabFocusRequesters[index])
+                    .logFocusTarget("Header.Tab[$index:${tab.title}]")
                     .focusOnClick(tabFocusRequesters[index])
                     .focusProperties {
                         up = FocusRequester.Cancel

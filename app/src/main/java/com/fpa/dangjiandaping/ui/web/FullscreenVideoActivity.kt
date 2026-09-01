@@ -66,6 +66,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.fpa.dangjiandaping.ui.focus.focusOnClick
+import com.fpa.dangjiandaping.ui.focus.logFocusTarget
 import com.shuyu.gsyvideoplayer.compose.native_.GSYPlayState
 import com.shuyu.gsyvideoplayer.compose.native_.GSYPlayerSurface
 import com.shuyu.gsyvideoplayer.compose.native_.rememberGSYPlayerController
@@ -319,17 +320,22 @@ private fun PlayerControlButton(
     upFocusRequester: FocusRequester? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
+    var confirmKeyPressed by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(8.dp)
     Box(
         modifier = Modifier
             .focusRequester(focusRequester)
+            .logFocusTarget("FullscreenPlayer.$text")
             .focusOnClick(focusRequester)
             .focusProperties {
                 rightFocusRequester?.let { right = it }
                 downFocusRequester?.let { down = it }
                 upFocusRequester?.let { up = it }
             }
-            .onFocusChanged { focused = it.isFocused }
+            .onFocusChanged {
+                focused = it.isFocused
+                if (!it.isFocused) confirmKeyPressed = false
+            }
             .clip(shape)
             .background(if (focused) Color(0xFFD71920) else Color(0xB3000000))
             .border(
@@ -338,13 +344,20 @@ private fun PlayerControlButton(
                 shape = shape,
             )
             .onPreviewKeyEvent { event ->
-                if (event.type == KeyEventType.KeyDown &&
+                val isConfirmKey =
                     event.key in setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
-                ) {
-                    onClick()
-                    true
-                } else {
-                    false
+                when {
+                    !isConfirmKey -> false
+                    event.type == KeyEventType.KeyDown -> {
+                        confirmKeyPressed = true
+                        true
+                    }
+                    event.type == KeyEventType.KeyUp && confirmKeyPressed -> {
+                        confirmKeyPressed = false
+                        onClick()
+                        true
+                    }
+                    else -> false
                 }
             }
             .clickable {
@@ -385,6 +398,7 @@ private fun TvSeekBar(
     Column(
         modifier = modifier
             .focusRequester(focusRequester)
+            .logFocusTarget("FullscreenPlayer.SeekBar")
             .focusOnClick(focusRequester)
             .focusProperties {
                 left = leftFocusRequester

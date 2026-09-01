@@ -28,6 +28,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.tv.material3.Text
 import com.fpa.dangjiandaping.ui.focus.focusOnClick
+import com.fpa.dangjiandaping.ui.focus.logFocusTarget
 
 internal val HelpDialogRed = Color(0xFF9F101B)
 internal val HelpDialogDeepRed = Color(0xFF620810)
@@ -74,6 +75,7 @@ internal fun TvDialogCloseButton(
             .background(if (focused) Color(0xFFD52B38) else Color(0xFFB62430))
             .border(if (focused) 3.dp else 2.dp, HelpDialogGold, CircleShape)
             .focusRequester(focusRequester)
+            .logFocusTarget("Dialog.Close")
             .focusOnClick(focusRequester)
             .clickable(role = Role.Button) {
                 focusRequester.requestFocus()
