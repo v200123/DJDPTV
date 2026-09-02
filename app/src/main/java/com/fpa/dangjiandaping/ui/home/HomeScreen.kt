@@ -93,7 +93,7 @@ import java.net.URL
 private const val DEFAULT_HOME_VIDEO_URL = "https://vod.scycjy.gov.cn/20260729/eE9NUYRQ/2000kb/hls/index.m3u8"
 private const val PARTY_PIONEER_MOBILE_URL = "https://12371.people.com.cn/"
 private const val PARTY_MEMBER_LEARNING_URL = "https://www.scycjy.gov.cn/dyxx_mys.html"
-private const val KANGBA_PARTY_FLAG_URL = "https://www.xyxf.gov.cn/#/index/subordinate/kbdqh"
+private const val KANGBA_PARTY_FLAG_URL = "https://www.scycjy.gov.cn/scdjw/2026wsdy.html"//专题专栏第三个选择
 private const val CADRE_APPOINTMENT_URL =
     "https://www.xyxf.gov.cn/#/index/details?id=2076661290549506050&name=%E5%B9%B2%E9%83%A8%E4%BB%BB%E5%85%8D%E5%85%AC%E7%A4%BA"
 
