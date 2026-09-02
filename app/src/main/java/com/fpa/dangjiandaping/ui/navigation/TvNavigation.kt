@@ -64,7 +64,7 @@ internal val TV_TABS = listOf(
         TvTabDestination.Web(PARTY_MEMBER_URL),
         recommended = true
     ),
-    TvTabSpec("咔哒时间·康巴党旗红", 1.65f, TvTabDestination.Web(kangba_URL)),
+//    TvTabSpec("咔哒时间·康巴党旗红", 1.65f, TvTabDestination.Web(kangba_URL)),
     TvTabSpec("师资库", 0.80f, TvTabDestination.Web(teacher_URL)),
     TvTabSpec("阵地库", 0.80f, TvTabDestination.Web(NAV_BASE_URL)),
     TvTabSpec("课件库", 0.80f, TvTabDestination.Web(courseware_URL)),
