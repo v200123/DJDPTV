@@ -21,7 +21,7 @@ android {
             buildConfigField(
                 "String",
                 "BASE_URL",
-                "\"http://192.168.20.233:5173/ganziTv/#/\""
+                "\"http://192.168.20.118:5173/ganziTv/#/\""
             )
         }
         release {

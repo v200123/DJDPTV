@@ -58,6 +58,7 @@ internal data class TvTabSpec(
 
 internal val TV_TABS = listOf(
     TvTabSpec("首页", 0.75f, TvTabDestination.NativeHome),
+    TvTabSpec("培训班", 0.80f, TvTabDestination.Web(peixunban_URL)),
     TvTabSpec(
         "有事找党员",
         1.10f,
@@ -68,7 +69,6 @@ internal val TV_TABS = listOf(
     TvTabSpec("师资库", 0.80f, TvTabDestination.Web(teacher_URL)),
     TvTabSpec("阵地库", 0.80f, TvTabDestination.Web(NAV_BASE_URL)),
     TvTabSpec("课件库", 0.80f, TvTabDestination.Web(courseware_URL)),
-    TvTabSpec("培训班", 0.80f, TvTabDestination.Web(peixunban_URL)),
     TvTabSpec("基层党建", 0.80f, TvTabDestination.Web(jicengdangjian_URL)),
     TvTabSpec("我的党支部", 1.10f, TvTabDestination.Web(party_URL))
 )
