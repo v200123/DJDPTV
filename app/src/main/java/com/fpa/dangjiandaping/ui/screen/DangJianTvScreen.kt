@@ -50,12 +50,12 @@ import androidx.navigation3.ui.NavDisplay
 import androidx.tv.material3.MaterialTheme
 import com.fpa.dangjiandaping.R
 import com.fpa.dangjiandaping.ui.MainContentHorizontalPadding
+import com.fpa.dangjiandaping.ui.andmu.AndmuDeviceScreen
 import com.fpa.dangjiandaping.ui.header.NativeHeader
 import com.fpa.dangjiandaping.ui.header.rememberTvTabFocusRequesters
 import com.fpa.dangjiandaping.ui.home.HomeScreen
-import com.fpa.dangjiandaping.ui.home.defaultPartyStats
-import com.fpa.dangjiandaping.ui.home.fetchPartyStats
 import com.fpa.dangjiandaping.ui.navigation.HomeRoute
+import com.fpa.dangjiandaping.ui.navigation.AndmuDevicesRoute
 import com.fpa.dangjiandaping.ui.navigation.TV_TABS
 import com.fpa.dangjiandaping.ui.navigation.TvRoute
 import com.fpa.dangjiandaping.ui.navigation.WebRoute
@@ -86,6 +86,7 @@ fun DangJianTvScreen(
     val currentRoute = (backStack.lastOrNull() as? TvRoute) ?: HomeRoute
     val selectedTab = when (currentRoute) {
         HomeRoute -> HOME_TAB_INDEX
+        is AndmuDevicesRoute -> currentRoute.tabIndex
         is WebRoute -> currentRoute.tabIndex
     }
 
@@ -96,7 +97,6 @@ fun DangJianTvScreen(
     var canWebViewGoBack by remember { mutableStateOf(false) }
     var pendingContentFocusRoute by remember { mutableStateOf<TvRoute?>(null) }
     var pendingTabFocusIndex by remember { mutableStateOf<Int?>(null) }
-    var partyStats by remember { mutableStateOf(defaultPartyStats) }
     var publicHelpRequest by remember { mutableStateOf<PublicHelpRequest?>(null) }
 
     val tabFocusRequesters = rememberTvTabFocusRequesters()
@@ -138,9 +138,11 @@ fun DangJianTvScreen(
     }
 
     fun activateTab(tabIndex: Int, moveFocusToContent: Boolean) {
-        val targetRoute = (currentRoute as? WebRoute)
-            ?.takeIf { it.tabIndex == tabIndex }
-            ?: TV_TABS[tabIndex].destination.toRoute(tabIndex)
+        val targetRoute = when (currentRoute) {
+            is WebRoute -> currentRoute.takeIf { it.tabIndex == tabIndex }
+            is AndmuDevicesRoute -> currentRoute.takeIf { it.tabIndex == tabIndex }
+            HomeRoute -> null
+        } ?: TV_TABS[tabIndex].destination.toRoute(tabIndex)
         activateRoute(
             tabIndex = tabIndex,
             targetRoute = targetRoute,
@@ -199,16 +201,6 @@ fun DangJianTvScreen(
             withFrameNanos { }
             tabFocusRequesters[selectedTab].requestFocus(FocusDirection.Up)
             pendingTabFocusIndex = null
-        }
-    }
-
-    LaunchedEffect(Unit) {
-        fetchPartyStats()?.let { fetchedCounts ->
-            partyStats = defaultPartyStats.map { stat ->
-                fetchedCounts[stat.title]?.let { update ->
-                    stat.copy(count = update.newsCount, channelId = update.channelId)
-                } ?: stat
-            }
         }
     }
 
@@ -272,6 +264,12 @@ fun DangJianTvScreen(
                         }
                     }
                 }
+
+                is AndmuDevicesRoute -> {
+                    withFrameNanos { }
+                    contentFocusRequester.requestFocus(FocusDirection.Down)
+                    pendingContentFocusRoute = null
+                }
             }
         }
     }
@@ -327,11 +325,10 @@ fun DangJianTvScreen(
                         HomeScreen(
                             active = currentRoute == HomeRoute && publicHelpRequest == null,
                             modifier = Modifier.fillMaxSize(),
-                            partyStats = partyStats,
                             contentFocusRequester = contentFocusRequester,
                             onRequestTabFocus = ::requestSelectedTabFocus,
                             onCoursewareClick = ::openCourseware,
-                            onPartyBuildingClick = ::openPartyBuilding,
+                            onPartyBuildingTabClick = { activateTab(6, moveFocusToContent = false) },
                         )
                     }
                     entry<WebRoute> { route ->
@@ -367,6 +364,15 @@ fun DangJianTvScreen(
                                     top = 8.dp,
                                     bottom = 10.dp,
                                 ),
+                        )
+                    }
+                    entry<AndmuDevicesRoute> { route ->
+                        AndmuDeviceScreen(
+                            active = currentRoute == route && publicHelpRequest == null,
+                            contentFocusRequester = contentFocusRequester,
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(top = 8.dp, bottom = 10.dp),
                         )
                     }
                 },

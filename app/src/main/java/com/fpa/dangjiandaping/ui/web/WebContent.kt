@@ -44,6 +44,10 @@ import com.fpa.dangjiandaping.BuildConfig
 
 private const val FOCUS_LOG_TAG = "FocusTrace"
 private const val WEB_LOG_TAG = "WebContent"
+private data class WebViewDialogRequest(
+    val url: String,
+    val title: String?,
+)
 //internal const val MOBILE_BROWSER_USER_AGENT =
 //    "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 " +
 //        "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
@@ -74,7 +78,7 @@ private class WebFocusBridge(
     private val onShowServiceTeam: (String) -> Unit,
     private val onShowPublicHelpRequest: (String) -> Unit,
     private val onPlayVideo: (String,String) -> Unit,
-    private val onShowWebViewUrl: (String) -> Unit,
+    private val onShowWebViewUrl: (String, String?) -> Unit,
 ) {
     @JavascriptInterface
     fun requestPreviousTabFocus() {
@@ -146,9 +150,14 @@ private class WebFocusBridge(
 
     @JavascriptInterface
     fun showWebViewUrl(url: String) {
-        Log.d(WEB_LOG_TAG, "H5 called showWebViewUrl: $url")
+        showWebViewUrl(url, null)
+    }
+
+    @JavascriptInterface
+    fun showWebViewUrl(url: String, title: String?) {
+        Log.d(WEB_LOG_TAG, "H5 called showWebViewUrl: url=$url, title=$title")
         webView.post {
-            onShowWebViewUrl(url.trim())
+            onShowWebViewUrl(url.trim(), title?.trim()?.takeIf(String::isNotEmpty))
         }
     }
 }
@@ -178,7 +187,7 @@ internal fun WebContent(
     var loadingUrl by remember { mutableStateOf<String?>(url) }
     var newsDetail by remember(url) { mutableStateOf<NewsDetail?>(null) }
     var serviceTeam by remember(url) { mutableStateOf<ServiceTeam?>(null) }
-    var webViewDialogUrl by remember(url) { mutableStateOf<String?>(null) }
+    var webViewDialogRequest by remember(url) { mutableStateOf<WebViewDialogRequest?>(null) }
     var restoreNewsDetailFocus by remember(url) { mutableStateOf(false) }
     var restoreServiceTeamFocus by remember(url) { mutableStateOf(false) }
     var restoreWebViewDialogFocus by remember(url) { mutableStateOf(false) }
@@ -233,8 +242,8 @@ internal fun WebContent(
         }
     }
 
-    LaunchedEffect(webViewDialogUrl, restoreWebViewDialogFocus) {
-        if (webViewDialogUrl == null && restoreWebViewDialogFocus) {
+    LaunchedEffect(webViewDialogRequest, restoreWebViewDialogFocus) {
+        if (webViewDialogRequest == null && restoreWebViewDialogFocus) {
             // The dialog is removed during this recomposition. Match the tab re-entry path:
             // return native focus, then clear only DOM's active element. The H5 visual focus
             // remains available for DPAD navigation, but confirm cannot reactivate a stale link.
@@ -374,9 +383,12 @@ internal fun WebContent(
                                         )
                                     }
                                 },
-                                onShowWebViewUrl = { requestedUrl ->
+                                onShowWebViewUrl = { requestedUrl, requestedTitle ->
                                     if (requestedUrl.isNotEmpty()) {
-                                        webViewDialogUrl = requestedUrl
+                                        webViewDialogRequest = WebViewDialogRequest(
+                                            url = requestedUrl,
+                                            title = requestedTitle,
+                                        )
                                     }
                                 },
                             ),
@@ -485,7 +497,7 @@ internal fun WebContent(
                         appInForeground &&
                         newsDetail == null &&
                         serviceTeam == null &&
-                        webViewDialogUrl == null
+                        webViewDialogRequest == null
                     view.isFocusable = webViewInteractive
                     view.isFocusableInTouchMode = webViewInteractive
                     if (webViewInteractive) {
@@ -555,11 +567,12 @@ internal fun WebContent(
             )
         }
 
-        webViewDialogUrl?.let { requestedUrl ->
+        webViewDialogRequest?.let { request ->
             WebViewDialog(
-                url = requestedUrl,
+                url = request.url,
+                title = request.title,
                 onDismiss = {
-                    webViewDialogUrl = null
+                    webViewDialogRequest = null
                     restoreWebViewDialogFocus = true
                 },
             )

@@ -21,7 +21,7 @@ android {
             buildConfigField(
                 "String",
                 "BASE_URL",
-                "\"http://192.168.20.118:5173/ganziTv/#/\""
+                "\"http://192.168.20.233:5173/ganziTv/#/\""
             )
         }
         release {
@@ -66,6 +66,7 @@ dependencies {
     implementation("androidx.navigation3:navigation3-ui:1.1.4")
     implementation("io.github.carguo:gsyvideoplayer-compose:13.1.0")
     implementation("io.github.carguo:gsyvideoplayer-exo2:13.1.0")
-
+    implementation("com.squareup.retrofit2:retrofit:3.0.0")
+    implementation("com.squareup.okhttp3:okhttp:4.12.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

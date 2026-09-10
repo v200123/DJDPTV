@@ -19,6 +19,11 @@
         android:usesCleartextTraffic="true">
 
         <activity
+            android:name=".ui.web.AndmuWebPlayerActivity"
+            android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
+            android:screenOrientation="landscape" />
+
+        <activity
             android:name=".ui.web.FullscreenVideoActivity"
             android:configChanges="keyboard|keyboardHidden|navigation|orientation|screenLayout|screenSize|smallestScreenSize|uiMode"
             android:screenOrientation="landscape" />

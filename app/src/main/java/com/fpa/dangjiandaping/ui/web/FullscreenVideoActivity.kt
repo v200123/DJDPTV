@@ -74,7 +74,12 @@ import com.shuyu.gsyvideoplayer.player.PlayerFactory
 import com.shuyu.gsyvideoplayer.video.base.GSYVideoView
 import tv.danmaku.ijk.media.exo2.Exo2PlayerManager
 
-/** Fullscreen video player opened from the WebView JavaScript bridge. */
+internal data class FullscreenVideoPlaybackResult(
+    val positionMs: Long,
+    val shouldResume: Boolean,
+)
+
+/** Fullscreen video player opened from the WebView JavaScript bridge or the home page. */
 class FullscreenVideoActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -83,6 +88,8 @@ class FullscreenVideoActivity : ComponentActivity() {
 
         val videoUrl = intent.getStringExtra(EXTRA_VIDEO_URL).orEmpty()
         val videoTitle = intent.getStringExtra(EXTRA_VIDEO_TITLE).orEmpty()
+        val startPositionMs = intent.getLongExtra(EXTRA_START_POSITION_MS, 0L).coerceAtLeast(0L)
+        val autoPlay = intent.getBooleanExtra(EXTRA_AUTO_PLAY, true)
         if (videoUrl.isBlank()) {
             finish()
             return
@@ -94,7 +101,17 @@ class FullscreenVideoActivity : ComponentActivity() {
                 FullscreenVideoPlayer(
                     videoUrl = videoUrl,
                     videoTitle = videoTitle,
-                    onExit = ::finish,
+                    startPositionMs = startPositionMs,
+                    autoPlay = autoPlay,
+                    onExit = { positionMs, shouldResume ->
+                        setResult(
+                            RESULT_OK,
+                            Intent()
+                                .putExtra(EXTRA_RESULT_POSITION_MS, positionMs)
+                                .putExtra(EXTRA_RESULT_SHOULD_RESUME, shouldResume),
+                        )
+                        finish()
+                    },
                 )
             }
         }
@@ -132,11 +149,32 @@ class FullscreenVideoActivity : ComponentActivity() {
     companion object {
         private const val EXTRA_VIDEO_URL = "video_url"
         private const val EXTRA_VIDEO_TITLE = "video_title"
+        private const val EXTRA_START_POSITION_MS = "start_position_ms"
+        private const val EXTRA_AUTO_PLAY = "auto_play"
+        private const val EXTRA_RESULT_POSITION_MS = "result_position_ms"
+        private const val EXTRA_RESULT_SHOULD_RESUME = "result_should_resume"
 
-        fun newIntent(context: Context, videoUrl: String, videoTitle: String): Intent =
+        fun newIntent(
+            context: Context,
+            videoUrl: String,
+            videoTitle: String,
+            startPositionMs: Long = 0L,
+            autoPlay: Boolean = true,
+        ): Intent =
             Intent(context, FullscreenVideoActivity::class.java)
                 .putExtra(EXTRA_VIDEO_URL, videoUrl)
                 .putExtra(EXTRA_VIDEO_TITLE, videoTitle)
+                .putExtra(EXTRA_START_POSITION_MS, startPositionMs.coerceAtLeast(0L))
+                .putExtra(EXTRA_AUTO_PLAY, autoPlay)
+
+        internal fun readPlaybackResult(intent: Intent?): FullscreenVideoPlaybackResult? {
+            intent ?: return null
+            return FullscreenVideoPlaybackResult(
+                positionMs = intent.getLongExtra(EXTRA_RESULT_POSITION_MS, 0L)
+                    .coerceAtLeast(0L),
+                shouldResume = intent.getBooleanExtra(EXTRA_RESULT_SHOULD_RESUME, true),
+            )
+        }
     }
 }
 
@@ -144,12 +182,15 @@ class FullscreenVideoActivity : ComponentActivity() {
 private fun FullscreenVideoPlayer(
     videoUrl: String,
     videoTitle: String,
-    onExit: () -> Unit,
+    startPositionMs: Long,
+    autoPlay: Boolean,
+    onExit: (positionMs: Long, shouldResume: Boolean) -> Unit,
 ) {
     val controller = rememberGSYPlayerController(
         url = videoUrl,
         title = videoTitle,
-        autoPlay = true,
+        autoPlay = false,
+        autoPauseResume = false,
     )
     val snapshot by controller.snapshot
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -157,24 +198,28 @@ private fun FullscreenVideoPlayer(
     val seekFocusRequester = remember { FocusRequester() }
     val exitFocusRequester = remember { FocusRequester() }
     var exiting by remember { mutableStateOf(false) }
-    var resumeAfterLifecyclePause by remember(controller) { mutableStateOf(true) }
+    var resumeAfterLifecyclePause by remember(controller) { mutableStateOf(autoPlay) }
 
     val exitPlayer = {
         if (!exiting) {
             exiting = true
+            val positionMs = snapshot.currentPosition
+            val shouldResume = snapshot.isPlaying
             // Release while GSYPlayerSurface is still attached. Once AndroidView.onRelease
             // detaches the host, controller disposal can no longer reach this player.
             controller.setStartAfterPrepared(false)
             controller.release()
-            onExit()
+            onExit(positionMs, shouldResume)
         }
     }
 
-    LaunchedEffect(controller, videoUrl) {
+    LaunchedEffect(controller, videoUrl, startPositionMs) {
         controller.setOverrideExtension(
             if (isHlsVideoUrl(videoUrl)) "m3u8" else null,
         )
         controller.setLooping(false)
+        controller.setSeekOnStart(startPositionMs)
+        if (autoPlay) controller.play()
     }
 
     DisposableEffect(lifecycleOwner, controller) {

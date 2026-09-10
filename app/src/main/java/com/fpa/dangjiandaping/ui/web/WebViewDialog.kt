@@ -67,11 +67,15 @@ private const val SCALE_WIDE_PAGE_SCRIPT =
 @Composable
 internal fun WebViewDialog(
     url: String,
+    title: String? = null,
     onDismiss: () -> Unit,
 ) {
     val closeFocusRequester = remember { FocusRequester() }
     val webViewHolder = remember { arrayOfNulls<WebView>(1) }
-    var pageTitle by remember { mutableStateOf("网页详情") }
+    val requestedTitle = title?.trim()?.takeIf(String::isNotEmpty)
+    var pageTitle by remember(url, requestedTitle) {
+        mutableStateOf(requestedTitle ?: "网页详情")
+    }
     var closeFocusRequestTrigger by remember { mutableIntStateOf(0) }
 
     Dialog(
@@ -108,7 +112,7 @@ internal fun WebViewDialog(
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
-                        text = pageTitle.ifBlank { "网页详情" },
+                        text = requestedTitle ?: pageTitle.ifBlank { "网页详情" },
                         color = HelpDialogWarmWhite,
                         fontSize = 23.sp,
                         fontWeight = FontWeight.Bold,
@@ -191,11 +195,13 @@ internal fun WebViewDialog(
                             webChromeClient = object : WebChromeClient() {
                                 override fun onReceivedTitle(view: WebView, title: String?) {
                                     super.onReceivedTitle(view, title)
-                                    pageTitle = title
-                                        ?.trim()
-                                        ?.takeIf(String::isNotEmpty)
-                                        ?: "网页详情"
-                                    view.contentDescription = pageTitle
+                                    if (requestedTitle == null) {
+                                        pageTitle = title
+                                            ?.trim()
+                                            ?.takeIf(String::isNotEmpty)
+                                            ?: "网页详情"
+                                    }
+                                    view.contentDescription = requestedTitle ?: pageTitle
                                 }
                             }
                             settings.apply {
@@ -220,7 +226,7 @@ internal fun WebViewDialog(
                     },
                     update = { webView ->
                         if (webView.tag != url) {
-                            pageTitle = "网页详情"
+                            pageTitle = requestedTitle ?: "网页详情"
                             webView.tag = url
                             webView.loadUrl(url)
                         }
@@ -239,8 +245,8 @@ internal fun WebViewDialog(
         }
     }
 
-    LaunchedEffect(url) {
-        pageTitle = "网页详情"
+    LaunchedEffect(url, requestedTitle) {
+        pageTitle = requestedTitle ?: "网页详情"
         closeFocusRequester.requestFocus()
     }
 

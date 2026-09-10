@@ -1,11 +1,8 @@
 package com.fpa.dangjiandaping.ui.home
 
-import android.R.attr.foreground
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
 import android.net.Uri
-import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateFloatAsState
@@ -21,6 +18,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -36,12 +34,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.key
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -65,7 +65,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -77,80 +76,148 @@ import androidx.compose.ui.zIndex
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.fpa.dangjiandaping.R
+import com.fpa.dangjiandaping.network.XyxfNewsApiClient
+import com.fpa.dangjiandaping.network.model.XyxfArticle
 import com.fpa.dangjiandaping.ui.focus.focusOnClick
 import com.fpa.dangjiandaping.ui.focus.logFocusTarget
+import com.fpa.dangjiandaping.ui.web.FullscreenVideoActivity
 import com.fpa.dangjiandaping.ui.web.WebViewDialog
 import com.shuyu.gsyvideoplayer.compose.native_.GSYPlayState
 import com.shuyu.gsyvideoplayer.compose.native_.GSYPlayerSurface
 import com.shuyu.gsyvideoplayer.compose.native_.rememberGSYPlayerController
 import com.shuyu.gsyvideoplayer.video.base.GSYVideoView
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
-import org.json.JSONObject
-import java.net.HttpURLConnection
-import java.net.URL
+import kotlinx.coroutines.CancellationException
 
 private const val DEFAULT_HOME_VIDEO_URL = "https://vod.scycjy.gov.cn/20260729/eE9NUYRQ/2000kb/hls/index.m3u8"
 private const val PARTY_PIONEER_MOBILE_URL = "https://12371.people.com.cn/"
 private const val PARTY_MEMBER_LEARNING_URL = "https://www.scycjy.gov.cn/dyxx_mys.html"
 private const val KANGBA_PARTY_FLAG_URL = "https://www.scycjy.gov.cn/scdjw/2026wsdy.html"//专题专栏第三个选择
-private const val CADRE_APPOINTMENT_URL =
-    "https://www.xyxf.gov.cn/#/index/details?id=2076661290549506050&name=%E5%B9%B2%E9%83%A8%E4%BB%BB%E5%85%8D%E5%85%AC%E7%A4%BA"
-
 private val Gold = Color(0xFFFFD889)
 private val BrightGold = Color(0xFFFFD186)
 private val PanelRed = Color(0xB078101B)
 private val PanelStroke = Color(0x90E56E59)
 private val PrimaryRed = Color(0xFFD71920)
 
-internal data class PartyStat(
-    @DrawableRes val icon: Int,
-    val title: String,
-    val count: Int,
-    val channelId: Int,
+private data class HomeFullscreenRequest(
+    val positionMs: Long,
+    val shouldResume: Boolean,
 )
 
-internal data class PartyStatUpdate(val channelId: Int, val newsCount: Int)
+private enum class PartyWorkCategory(
+    val label: String,
+    val columnId: String,
+    val onlyImage: Boolean,
+    @DrawableRes val coverImage: Int,
+) {
+    WorkDynamics(
+        label = "工作动态",
+        columnId = "1978746246661910530",
+        onlyImage = true,
+        coverImage = R.drawable.ic_home_gzdt_head,
+    ),
+    PioneerCommentary(
+        label = "雪域先锋时评",
+        columnId = "2009152698225565697",
+        onlyImage = false,
+        coverImage = R.drawable.ic_home_xyxf_head,
+    ),
+}
 
-private const val PARTY_STATISTICS_URL =
-    "https://www.scycjy.gov.cn/api/services/app/NewsService/GetChildChannelList?Id=8545"
+private sealed interface PartyWorkFeedState {
+    data object Loading : PartyWorkFeedState
 
-internal val defaultPartyStats = listOf(
-    PartyStat(R.drawable.ic_home_dangjian_nongcun, "农村党建", 126, 10899),
-    PartyStat(R.drawable.ic_home_chengshishequ, "城市社区", 54, 10897),
-    PartyStat(R.drawable.ic_home_jiguandangjian, "\u3000机关党建\u3000", 105, 10905),
-    PartyStat(R.drawable.ic_home_shiyedanwei, "事业单位", 126, 10909),
-    PartyStat(R.drawable.ic_home_qiyedangjian, "企业党建", 26, 10903),
-    PartyStat(R.drawable.ic_home_xinxinglingyu, "新兴领域", 154, 10901),
-    PartyStat(R.drawable.ic_home_dangyuanjiaoyu, "党员教育动态", 105, 8565),
-    PartyStat(R.drawable.ic_home_dangjian_qita, "其\u3000\u3000他", 105, 10913),
-)
+    data class Loaded(val articles: List<XyxfArticle>) : PartyWorkFeedState
 
-private data class CadreTask(val name: String, val duty: String, val date: String)
-
-private val cadreTasks = listOf(
-    CadreTask("李尚谦", "拟任正县级领导职务", "2026-07-13"),
-    CadreTask("祁光清", "拟任县（市）党委副书记", "2026-07-13"),
-    CadreTask("曲几扎波", "拟任副县级领导职务", "2026-06-12"),
-)
+    data class Failed(val message: String) : PartyWorkFeedState
+}
 
 @Composable
 internal fun HomeScreen(
     modifier: Modifier = Modifier,
     active: Boolean = true,
     videoUrl: String = DEFAULT_HOME_VIDEO_URL,
-    partyStats: List<PartyStat> = defaultPartyStats,
     contentFocusRequester: FocusRequester? = null,
     onRequestTabFocus: () -> Unit = {},
     onCoursewareClick: (Int) -> Unit = {},
-    onPartyBuildingClick: (Int) -> Unit = {},
+    onPartyBuildingTabClick: () -> Unit = {},
 ) {
+    val context = LocalContext.current
     val lastTopicFocusRequester = remember { FocusRequester() }
     val fullscreenFocusRequester = remember { FocusRequester() }
     val videoControlFocusRequester = remember { FocusRequester() }
     val firstPartyBuildingFocusRequester = remember { FocusRequester() }
-    val cadreAppointmentFocusRequester = remember { FocusRequester() }
+    val lowerPartyBuildingFocusRequester = remember { FocusRequester() }
+    val partyWorkTabFocusRequester = remember { FocusRequester() }
+    val partyWorkReviewFocusRequester = remember { FocusRequester() }
+    val partyWorkMoreFocusRequester = remember { FocusRequester() }
     var webViewDialogUrl by remember { mutableStateOf<String?>(null) }
+    var partyWorkCategory by remember { mutableStateOf(PartyWorkCategory.WorkDynamics) }
+    var partyWorkFeedStates by remember {
+        mutableStateOf<Map<PartyWorkCategory, PartyWorkFeedState>>(emptyMap())
+    }
+    var partyWorkRetryCategory by remember { mutableStateOf<PartyWorkCategory?>(null) }
+    val partyWorkFeedState = partyWorkFeedStates[partyWorkCategory] ?: PartyWorkFeedState.Loading
+    var homeVideoVisible by remember { mutableStateOf(true) }
+    var homeVideoSession by remember { mutableIntStateOf(0) }
+    var homeVideoStartPositionMs by remember { mutableLongStateOf(0L) }
+    var homeVideoAutoPlay by remember { mutableStateOf(true) }
+    var pendingFullscreenRequest by remember { mutableStateOf<HomeFullscreenRequest?>(null) }
+    val fullscreenLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        val request = pendingFullscreenRequest
+        val playback = FullscreenVideoActivity.readPlaybackResult(result.data)
+        homeVideoStartPositionMs = playback?.positionMs ?: request?.positionMs ?: 0L
+        homeVideoAutoPlay = playback?.shouldResume ?: request?.shouldResume ?: true
+        homeVideoSession += 1
+        homeVideoVisible = true
+        pendingFullscreenRequest = null
+    }
+
+    LaunchedEffect(pendingFullscreenRequest) {
+        val request = pendingFullscreenRequest ?: return@LaunchedEffect
+        // 先让首页 AndroidView 释放，再启动独立全屏播放器；两者绝不共用或克隆 Surface。
+        withFrameNanos { }
+        fullscreenLauncher.launch(
+            FullscreenVideoActivity.newIntent(
+                context = context,
+                videoUrl = videoUrl,
+                videoTitle = "康巴党旗红",
+                startPositionMs = request.positionMs,
+                autoPlay = request.shouldResume,
+            ),
+        )
+    }
+
+    LaunchedEffect(active, partyWorkCategory, partyWorkRetryCategory) {
+        if (!active) return@LaunchedEffect
+        val requestCategory = partyWorkCategory
+        val shouldRetry = partyWorkRetryCategory == requestCategory
+        if (!shouldRetry && partyWorkFeedStates.containsKey(requestCategory)) {
+            return@LaunchedEffect
+        }
+        partyWorkFeedStates = partyWorkFeedStates + (
+            requestCategory to PartyWorkFeedState.Loading
+        )
+        val loadedState = runCatching {
+            XyxfNewsApiClient.getArticles(
+                columnId = requestCategory.columnId,
+                onlyImage = requestCategory.onlyImage,
+            ).articles
+        }.fold(
+            onSuccess = { articles -> PartyWorkFeedState.Loaded(articles) },
+            onFailure = { error ->
+                if (error is CancellationException) throw error
+                PartyWorkFeedState.Failed(
+                    error.message?.ifBlank { null } ?: "资讯加载失败，请稍后重试。",
+                )
+            },
+        )
+        partyWorkFeedStates = partyWorkFeedStates + (requestCategory to loadedState)
+        if (shouldRetry && partyWorkRetryCategory == requestCategory) {
+            partyWorkRetryCategory = null
+        }
+    }
 
     Box(
         modifier = modifier
@@ -196,21 +263,37 @@ internal fun HomeScreen(
                 HomeVideoPlayer(
                     active = active && webViewDialogUrl == null,
                     videoUrl = videoUrl,
+                    showRuntime = homeVideoVisible,
+                    sessionKey = homeVideoSession,
+                    startPositionMs = homeVideoStartPositionMs,
+                    autoPlay = homeVideoAutoPlay,
                     playFocusRequester = videoControlFocusRequester,
                     fullscreenFocusRequester = fullscreenFocusRequester,
                     rightFocusRequester = firstPartyBuildingFocusRequester,
+                    onFullscreen = { positionMs, shouldResume ->
+                        homeVideoVisible = false
+                        pendingFullscreenRequest = HomeFullscreenRequest(
+                            positionMs = positionMs,
+                            shouldResume = shouldResume,
+                        )
+                    },
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight(),
                 )
                 PartyWorkPanel(
-                    partyStats = partyStats,
                     videoControlFocusRequester = videoControlFocusRequester,
                     topFocusRequester = contentFocusRequester,
                     firstItemFocusRequester = firstPartyBuildingFocusRequester,
-                    cadreAppointmentFocusRequester = cadreAppointmentFocusRequester,
-                    onPartyBuildingClick = onPartyBuildingClick,
-                    onCadreClick = { webViewDialogUrl = CADRE_APPOINTMENT_URL },
+                    lowerItemFocusRequester = lowerPartyBuildingFocusRequester,
+                    tabFocusRequester = partyWorkTabFocusRequester,
+                    reviewTabFocusRequester = partyWorkReviewFocusRequester,
+                    moreFocusRequester = partyWorkMoreFocusRequester,
+                    selectedCategory = partyWorkCategory,
+                    feedState = partyWorkFeedState,
+                    onCategorySelected = { partyWorkCategory = it },
+                    onRetry = { partyWorkRetryCategory = partyWorkCategory },
+                    onMoreClick = onPartyBuildingTabClick,
                     modifier = Modifier
                         .weight(1.08f)
                         .fillMaxHeight(),
@@ -232,7 +315,7 @@ internal fun HomeScreen(
                         .fillMaxHeight(),
                 )
                 CoursewarePanel(
-                    cadreAppointmentFocusRequester = cadreAppointmentFocusRequester,
+                    partyBuildingFocusRequester = lowerPartyBuildingFocusRequester,
                     onCoursewareClick = onCoursewareClick,
                     modifier = Modifier
                         .weight(1.08f)
@@ -248,44 +331,6 @@ internal fun HomeScreen(
             )
         }
     }
-}
-
-internal suspend fun fetchPartyStats(): Map<String, PartyStatUpdate>? = withContext(Dispatchers.IO) {
-    runCatching {
-        val response = (URL(PARTY_STATISTICS_URL).openConnection() as HttpURLConnection).run {
-            connectTimeout = 10_000
-            readTimeout = 10_000
-            requestMethod = "GET"
-            inputStream.bufferedReader().use { it.readText() }.also { disconnect() }
-        }
-        val children = JSONObject(response)
-            .optJSONObject("result")
-            ?.optJSONArray("children")
-            ?: return@runCatching emptyMap()
-        val titleByChannel = mapOf(
-            "农村" to "农村党建",
-            "城市社区" to "城市社区",
-            "机关党员" to "机关党建",
-            "事业单位" to "事业单位",
-            "企业" to "企业党建",
-            "新兴领域" to "新兴领域",
-            "党员教育动态" to "党员教育动态",
-        )
-
-        buildMap {
-            for (index in 0 until children.length()) {
-                val child = children.optJSONObject(index) ?: continue
-                val title = titleByChannel[child.optString("channelName")] ?: continue
-                put(
-                    title,
-                    PartyStatUpdate(
-                        channelId = child.optInt("id"),
-                        newsCount = child.optInt("newsCount"),
-                    ),
-                )
-            }
-        }
-    }.getOrNull()
 }
 
 @Composable
@@ -366,7 +411,7 @@ private fun NewsTicker(
             SpeakerIcon(Modifier.size(24.dp))
             Spacer(Modifier.width(12.dp))
             TickerItem(
-                text = "丹巴县：依托教育人才“组团式”帮扶推动高中教育提质增效",
+                text = "关于组织开展2024年度党员教育培训工作",
                 onClick = {
                     onOpenUrl(
                         "https://www.xyxf.gov.cn/#/index/details?id=2080461005451776002&name=%E5%B7%A5%E4%BD%9C%E5%8A%A8%E6%80%81",
@@ -378,7 +423,7 @@ private fun NewsTicker(
             )
             TickerDivider()
             TickerItem(
-                text = "九龙县：“三线共进”推动流动党员经常性教育管理提质增效",
+                text = "雅江县：“三维赋能”让党员教育在高原落地生根",
                 modifier = Modifier.weight(1.2f),
                 onClick = {
                     onOpenUrl(
@@ -388,7 +433,7 @@ private fun NewsTicker(
             )
             TickerDivider()
             TickerItem(
-                text = "道孚县：党建之花开出振兴硕果",
+                text = "康定市：建强农业实用人才队伍……",
                 modifier = Modifier.weight(0.82f),
                 onClick = {
                     onOpenUrl(
@@ -477,9 +522,14 @@ private fun SpeakerIcon(modifier: Modifier = Modifier) {
 private fun HomeVideoPlayer(
     active: Boolean,
     videoUrl: String,
+    showRuntime: Boolean,
+    sessionKey: Int,
+    startPositionMs: Long,
+    autoPlay: Boolean,
     playFocusRequester: FocusRequester? = null,
     fullscreenFocusRequester: FocusRequester? = null,
     rightFocusRequester: FocusRequester? = null,
+    onFullscreen: (positionMs: Long, shouldResume: Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val inPreview = LocalInspectionMode.current
@@ -490,17 +540,24 @@ private fun HomeVideoPlayer(
             .background(Color.Black)
             .border(3.dp, Color(0xFFE8B56F), RoundedCornerShape(14.dp)),
     ) {
-        if (inPreview) {
+        if (inPreview || !showRuntime) {
             VideoPoster(Modifier.fillMaxSize())
-            StaticVideoControls(Modifier.align(Alignment.BottomCenter))
+            if (inPreview) {
+                StaticVideoControls(Modifier.align(Alignment.BottomCenter))
+            }
         } else {
-            RuntimeVideoPlayer(
-                active = active,
-                videoUrl = videoUrl,
-                playFocusRequester = playFocusRequester,
-                fullscreenFocusRequester = fullscreenFocusRequester,
-                rightFocusRequester = rightFocusRequester,
-            )
+            key(sessionKey) {
+                RuntimeVideoPlayer(
+                    active = active,
+                    videoUrl = videoUrl,
+                    startPositionMs = startPositionMs,
+                    autoPlay = autoPlay,
+                    playFocusRequester = playFocusRequester,
+                    fullscreenFocusRequester = fullscreenFocusRequester,
+                    rightFocusRequester = rightFocusRequester,
+                    onFullscreen = onFullscreen,
+                )
+            }
         }
 
 //        Box(
@@ -520,16 +577,21 @@ private fun HomeVideoPlayer(
 private fun RuntimeVideoPlayer(
     active: Boolean,
     videoUrl: String,
+    startPositionMs: Long,
+    autoPlay: Boolean,
     playFocusRequester: FocusRequester?,
     fullscreenFocusRequester: FocusRequester?,
     rightFocusRequester: FocusRequester?,
+    onFullscreen: (positionMs: Long, shouldResume: Boolean) -> Unit,
 ) {
-    val context = LocalContext.current
-    val activity = remember(context) { context.findActivity() }
     val controller = rememberGSYPlayerController(
         url = videoUrl,
         title = "康巴党旗红",
-        autoPlay = true,
+        // 首播在下方配置 seek 后由首页的 Lifecycle 逻辑启动，避免先从 0 播放一帧。
+        autoPlay = false,
+        // 首页自行按照 active 与 Lifecycle 控制暂停/恢复；不要再由库的全局
+        // GSYVideoManager 同时干预，避免全屏克隆与首页 Surface 争夺播放状态。
+        autoPauseResume = false,
     )
     val snapshot by controller.snapshot
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -537,7 +599,7 @@ private fun RuntimeVideoPlayer(
         mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
     }
     var previousPlaybackAllowed by remember(controller) { mutableStateOf<Boolean?>(null) }
-    var resumeAfterInterruption by remember(controller) { mutableStateOf(true) }
+    var resumeAfterInterruption by remember(controller) { mutableStateOf(autoPlay) }
 
     DisposableEffect(lifecycleOwner) {
         val observer = LifecycleEventObserver { _, event ->
@@ -552,6 +614,14 @@ private fun RuntimeVideoPlayer(
     }
 
     val playbackAllowed = active && appInForeground
+    // 在准备播放前完成 HLS 类型与续播进度配置。全屏返回后的会话是一个全新
+    // controller，因此不会保留已被全屏窗口克隆过的 Exo 输出 Surface。
+    LaunchedEffect(controller, videoUrl, startPositionMs) {
+        controller.setOverrideExtension(
+            if (isHlsVideoUrl(videoUrl)) "m3u8" else null,
+        )
+        controller.setSeekOnStart(startPositionMs.coerceAtLeast(0L))
+    }
     LaunchedEffect(controller, playbackAllowed) {
         val wasAllowed = previousPlaybackAllowed
         if (!playbackAllowed) {
@@ -581,43 +651,16 @@ private fun RuntimeVideoPlayer(
         }
         previousPlaybackAllowed = playbackAllowed
     }
-    // GSY 已在应用入口切换到 Exo2/Media3 内核。对 HLS 地址再显式声明格式，
-    // 可避免带 query 参数的 m3u8 链接被错误按普通媒体源解析。
-    LaunchedEffect(controller, videoUrl) {
-        controller.setOverrideExtension(
-            if (isHlsVideoUrl(videoUrl)) "m3u8" else null,
-        )
-    }
     var dragging by remember { mutableStateOf(false) }
     var dragFraction by remember { mutableFloatStateOf(0f) }
-    var surfaceGeneration by remember { mutableStateOf(0) }
-    var rebindSurfaceAfterFullscreen by remember { mutableStateOf(false) }
-
-    BackHandler(enabled = controller.isFullscreen && activity != null) {
-        activity?.let {
-            controller.exitFullscreen(it)
-            rebindSurfaceAfterFullscreen = true
-        }
-    }
-
-    LaunchedEffect(rebindSurfaceAfterFullscreen) {
-        if (rebindSurfaceAfterFullscreen) {
-            // Let the fullscreen surface finish detaching before attaching a fresh inline one.
-            withFrameNanos { }
-            withFrameNanos { }
-            surfaceGeneration += 1
-            rebindSurfaceAfterFullscreen = false
-        }
-    }
 
     Box(Modifier.fillMaxSize()) {
-        key(surfaceGeneration) {
-            GSYPlayerSurface(controller, Modifier.matchParentSize())
-        }
+        GSYPlayerSurface(controller, Modifier.matchParentSize())
 
         if (snapshot.state == GSYPlayState.Idle ||
             snapshot.state == GSYPlayState.Preparing ||
-            snapshot.state == GSYPlayState.Error
+            snapshot.state == GSYPlayState.Error ||
+            snapshot.state == GSYPlayState.Completed
         ) {
             VideoPoster(Modifier.fillMaxSize())
         }
@@ -655,7 +698,12 @@ private fun RuntimeVideoPlayer(
                 controller.seekTo((snapshot.duration * fraction).toLong())
                 dragging = false
             },
-            onFullscreen = { activity?.let { controller.enterFullscreen(it) } },
+            onFullscreen = {
+                onFullscreen(
+                    snapshot.currentPosition,
+                    snapshot.isPlaying,
+                )
+            },
             primaryControlFocusRequester = playFocusRequester,
             primaryControlRightFocusRequester = rightFocusRequester,
             fullscreenFocusRequester = fullscreenFocusRequester,
@@ -770,19 +818,19 @@ private fun VideoControlBar(
             fontSize = 9.sp,
         )
 //        VideoBarButton(")))", onClick = {})
-//        VideoBarButton(
-//            label = "⛶",
-//            onClick = onFullscreen,
-//            modifier = Modifier
-//                .size(30.dp)
-//                .then(
-//                    if (fullscreenFocusRequester != null) {
-//                        Modifier.focusRequester(fullscreenFocusRequester)
-//                    } else {
-//                        Modifier
-//                    }
-//                ),
-//        )
+        VideoBarButton(
+            label = "⛶",
+            onClick = onFullscreen,
+            modifier = Modifier
+                .size(30.dp)
+                .then(
+                    if (fullscreenFocusRequester != null) {
+                        Modifier.focusRequester(fullscreenFocusRequester)
+                    } else {
+                        Modifier
+                    }
+                ),
+        )
     }
 }
 
@@ -912,97 +960,125 @@ private fun FocusableAction(
 
 @Composable
 private fun PartyWorkPanel(
-    partyStats: List<PartyStat>,
     videoControlFocusRequester: FocusRequester,
     topFocusRequester: FocusRequester?,
     firstItemFocusRequester: FocusRequester,
-    cadreAppointmentFocusRequester: FocusRequester,
-    onPartyBuildingClick: (Int) -> Unit,
-    onCadreClick: () -> Unit,
+    lowerItemFocusRequester: FocusRequester,
+    tabFocusRequester: FocusRequester,
+    reviewTabFocusRequester: FocusRequester,
+    moreFocusRequester: FocusRequester,
+    selectedCategory: PartyWorkCategory,
+    feedState: PartyWorkFeedState,
+    onCategorySelected: (PartyWorkCategory) -> Unit,
+    onRetry: () -> Unit,
+    onMoreClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val sectionHorizontalPadding = 4.dp
+    val displayItems = when (feedState) {
+        PartyWorkFeedState.Loading -> listOf(
+            PartyWorkDisplayItem(title = "正在加载${selectedCategory.label}…", publishedAt = ""),
+        )
+
+        is PartyWorkFeedState.Loaded -> feedState.articles
+            .take(PARTY_WORK_VISIBLE_COUNT)
+            .map { article ->
+                PartyWorkDisplayItem(
+                    title = article.title,
+                    publishedAt = article.publishedAt,
+                )
+            }
+            .ifEmpty {
+                listOf(PartyWorkDisplayItem(title = "暂无${selectedCategory.label}", publishedAt = ""))
+            }
+
+        is PartyWorkFeedState.Failed -> listOf(
+            PartyWorkDisplayItem(title = feedState.message, publishedAt = "按确认键重试"),
+        )
+    }
 
     HomePanel(modifier.focusGroup()) {
-        SectionTitle(R.drawable.ic_home_jiceng)
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(28.dp),
+        ) {
+            SectionTitle(R.drawable.ic_home_zugongdongtai)
+            PartyWorkMoreButton(
+                focusRequester = moreFocusRequester,
+                leftFocusRequester = reviewTabFocusRequester,
+                downFocusRequester = firstItemFocusRequester,
+                onClick = onMoreClick,
+                modifier = Modifier.align(Alignment.CenterEnd),
+            )
+        }
+        Spacer(Modifier.height(4.dp))
+        Row(
+            modifier = Modifier
+                .height(26.dp)
+                .padding(horizontal = 4.dp),
+        ) {
+            PartyWorkTab(
+                category = PartyWorkCategory.WorkDynamics,
+                selected = selectedCategory == PartyWorkCategory.WorkDynamics,
+                focusRequester = tabFocusRequester,
+                upFocusRequester = topFocusRequester,
+                downFocusRequester = firstItemFocusRequester,
+                rightFocusRequester = reviewTabFocusRequester,
+                leftFocusRequester = videoControlFocusRequester,
+                onClick = { onCategorySelected(PartyWorkCategory.WorkDynamics) },
+            )
+            PartyWorkTab(
+                category = PartyWorkCategory.PioneerCommentary,
+                selected = selectedCategory == PartyWorkCategory.PioneerCommentary,
+                focusRequester = reviewTabFocusRequester,
+                upFocusRequester = topFocusRequester,
+                downFocusRequester = firstItemFocusRequester,
+                rightFocusRequester = moreFocusRequester,
+                leftFocusRequester = tabFocusRequester,
+                onClick = { onCategorySelected(PartyWorkCategory.PioneerCommentary) },
+            )
+        }
         Spacer(Modifier.height(3.dp))
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = sectionHorizontalPadding),
-            verticalArrangement = Arrangement.spacedBy(6.dp),
+                .weight(1f)
         ) {
-            PartyStatRow(
-                stats = partyStats.take(4),
-                leftFocusRequester = videoControlFocusRequester,
-                initialFocusRequester = firstItemFocusRequester,
-                upFocusRequester = topFocusRequester,
-                onItemClick = onPartyBuildingClick,
-            )
-            PartyStatRow(
-                stats = partyStats.drop(4).take(4),
-                leftFocusRequester = videoControlFocusRequester,
-                onItemClick = onPartyBuildingClick,
-            )
-        }
-
-        Spacer(Modifier.height(5.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Box(Modifier.weight(1f)) { SectionTitle(R.drawable.ic_home_ganburenmian) }
-        }
-        Spacer(Modifier.height(2.dp))
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(0.86f)
-                .padding(horizontal = sectionHorizontalPadding),
-            verticalArrangement = Arrangement.spacedBy(
-                space = 5.dp,
-                alignment = Alignment.CenterVertically,
-            ),
-        ) {
-            cadreTasks.take(2).forEachIndexed { index, task ->
-                PartyPanelFocusableItem(
+            displayItems.forEachIndexed { index, item ->
+                PartyWorkCard(
+                    item = item,
+                    coverImage = selectedCategory.coverImage,
                     modifier = Modifier
                         .fillMaxWidth()
+                        .weight(1f)
                         .then(
-                            if (index == 1) {
-                                Modifier.focusRequester(cadreAppointmentFocusRequester)
+                            if (index == 0) {
+                                Modifier.focusRequester(firstItemFocusRequester)
+                            } else if (index == displayItems.lastIndex) {
+                                Modifier.focusRequester(lowerItemFocusRequester)
                             } else {
                                 Modifier
+                            },
+                        )
+                        .focusProperties {
+                            if (index == 0) {
+                                left = videoControlFocusRequester
+                                up = tabFocusRequester
                             }
-                        )
-                        .focusProperties { left = videoControlFocusRequester },
-                    onClick = onCadreClick,
-                ) {
-                    Row(
-                        modifier = Modifier
+                        },
+                    onClick = {
+                        if (feedState is PartyWorkFeedState.Failed) {
+                            onRetry()
+                        }
+                    },
+                )
+                if (index != displayItems.lastIndex) {
+                    Spacer(
+                        Modifier
                             .fillMaxWidth()
-                            .padding(horizontal = 4.dp, vertical = 2.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                    ) {
-                        Box(Modifier.size(5.dp).background(Color(0xFFF6CD8B)))
-                        Text(
-                            task.name,
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            fontWeight = FontWeight.Bold,
-                            modifier = Modifier.padding(start = 8.dp).width(76.dp),
-                        )
-                        Text(
-                            task.duty,
-                            color = Color.White,
-                            fontSize = 11.sp,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.weight(1f),
-                        )
-                        Text(
-                            task.date,
-                            color = Color.White,
-                            fontSize = 10.sp,
-                        )
-                    }
+                            .height(1.dp)
+                            .background(Color(0x30FFE4C0)),
+                    )
                 }
             }
         }
@@ -1010,47 +1086,56 @@ private fun PartyWorkPanel(
 }
 
 @Composable
-private fun PartyStatRow(
-    stats: List<PartyStat>,
+private fun PartyWorkTab(
+    category: PartyWorkCategory,
+    selected: Boolean,
+    focusRequester: FocusRequester,
+    upFocusRequester: FocusRequester?,
+    downFocusRequester: FocusRequester,
     leftFocusRequester: FocusRequester,
-    initialFocusRequester: FocusRequester? = null,
-    upFocusRequester: FocusRequester? = null,
-    onItemClick: (Int) -> Unit,
+    rightFocusRequester: FocusRequester,
+    onClick: () -> Unit,
 ) {
-    if (stats.isEmpty()) return
-
-    fun itemModifier(index: Int, base: Modifier): Modifier {
-        var result = base
-        if (index == 0 && initialFocusRequester != null) {
-            result = result.focusRequester(initialFocusRequester)
-        }
-        return result.focusProperties {
-            if (index == 0) {
+    var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(2.dp)
+    Box(
+        modifier = Modifier
+            .height(26.dp)
+            .background(if (selected) Color(0xFFFFD58B) else Color(0x88EF503B))
+            .then(if (focused) Modifier.border(2.dp, Gold, shape) else Modifier)
+            .clip(shape)
+            .onFocusChanged { focused = it.isFocused }
+            .focusRequester(focusRequester)
+            .focusProperties {
+                upFocusRequester?.let { up = it }
+                down = downFocusRequester
                 left = leftFocusRequester
+                right = rightFocusRequester
             }
-            if (upFocusRequester != null) {
-                up = upFocusRequester
+            .logFocusTarget("Home.PartyWorkTab[${category.label}]")
+            .focusOnClick(focusRequester)
+            .clickable {
+                focusRequester.requestFocus()
+                onClick()
             }
-        }
-    }
-
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
+            .focusable()
+            .padding(horizontal = 14.dp),
+        contentAlignment = Alignment.Center,
     ) {
-        stats.forEachIndexed { index, stat ->
-            PartyStatItem(
-                stat = stat,
-                modifier = itemModifier(index, Modifier),
-                onClick = { onItemClick(stat.channelId) },
-            )
-        }
+        Text(
+            text = category.label,
+            color = if (selected) Color(0xFF8C251D) else Color(0xFFF8D7C8),
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+        )
     }
 }
 
 @Composable
-private fun PartyStatItem(
-    stat: PartyStat,
+private fun PartyWorkCard(
+    item: PartyWorkDisplayItem,
+    @DrawableRes coverImage: Int,
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {},
 ) {
@@ -1059,38 +1144,107 @@ private fun PartyStatItem(
         onClick = onClick,
     ) {
         Box(
-            modifier = Modifier.padding(horizontal = 4.dp, vertical = 1.dp),
+            modifier = Modifier.fillMaxSize(),
             contentAlignment = Alignment.Center,
         ) {
-            Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                Image(
-                    painter = painterResource(stat.icon),
-                    contentDescription = "",
-                    contentScale = ContentScale.Fit,
-                    modifier = Modifier.size(width = 32.dp, height = 28.dp),
-                )
-                Text(
-                    text = partyStatDisplayTitle(stat.title),
-                    color = Color(0xFFF8EAEA),
-                    fontSize = 11.sp,
-                    lineHeight = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    textAlign = TextAlign.Center,
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Min)
+                    .padding(start = 3.dp, end = 2.dp, top = 5.dp, bottom = 5.dp),
+                verticalAlignment = Alignment.Top,
+            ) {
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(7.dp),
+                ) {
+                    Text(
+                        text = item.title,
+                        color = Color.White,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        text = item.publishedAt,
+                        color = Color(0xFFFEE5E2),
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                        maxLines = 1,
+                    )
+                }
+                Spacer(Modifier.width(8.dp))
+                PartyWorkBadge(
+                    coverImage = coverImage,
+                    modifier = Modifier.fillMaxHeight(),
                 )
             }
         }
     }
 }
 
-private fun partyStatDisplayTitle(title: String): String = when (title) {
-    "农村党建" -> "农　村"
-    "机关党建" -> "机关党员"
-    "企业党建" -> "企　业"
-    "其他" -> "其　他"
-    else -> title
+@Composable
+private fun PartyWorkBadge(
+    @DrawableRes coverImage: Int,
+    modifier: Modifier = Modifier,
+) {
+    Image(
+        painter = painterResource(coverImage),
+        contentDescription = null,
+        contentScale = ContentScale.FillBounds,
+        modifier = modifier
+            .width(58.dp)
+            .clip(RoundedCornerShape(3.dp))
+            .border(1.dp, Color(0x55FA6A54), RoundedCornerShape(3.dp)),
+    )
 }
+
+@Composable
+private fun PartyWorkMoreButton(
+    focusRequester: FocusRequester,
+    leftFocusRequester: FocusRequester,
+    downFocusRequester: FocusRequester,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(4.dp)
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .background(if (focused) Color(0x44FFFFFF) else Color.Transparent)
+            .then(if (focused) Modifier.border(2.dp, Gold, shape) else Modifier)
+            .onFocusChanged { focused = it.isFocused }
+            .focusRequester(focusRequester)
+            .focusProperties {
+                left = leftFocusRequester
+                down = downFocusRequester
+            }
+            .logFocusTarget("Home.PartyWorkMore")
+            .focusOnClick(focusRequester)
+            .clickable {
+                focusRequester.requestFocus()
+                onClick()
+            }
+            .focusable()
+            .padding(horizontal = 4.dp, vertical = 3.dp),
+    ) {
+        Text(
+            text = "更多+",
+            color = Color.White,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.Bold,
+        )
+    }
+}
+
+private data class PartyWorkDisplayItem(
+    val title: String,
+    val publishedAt: String,
+)
+
+private const val PARTY_WORK_VISIBLE_COUNT = 3
 
 @Composable
 private fun PartyPanelFocusableItem(
@@ -1187,12 +1341,12 @@ private fun FeatureCard(
 
 @Composable
 private fun CoursewarePanel(
-    cadreAppointmentFocusRequester: FocusRequester,
+    partyBuildingFocusRequester: FocusRequester,
     onCoursewareClick: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     HomePanel(modifier) {
-        SectionTitle(R.drawable.ic_home_zuixinkejian)
+        SectionTitle(R.drawable.ic_home_shipinkejian)
         Spacer(Modifier.height(4.dp))
         Row(
             modifier = Modifier.fillMaxSize(),
@@ -1201,21 +1355,21 @@ private fun CoursewarePanel(
             FeatureCard(
                 modifier = Modifier
                     .weight(1f)
-                    .focusProperties { up = cadreAppointmentFocusRequester },
+                    .focusProperties { up = partyBuildingFocusRequester },
                 image = R.drawable.ic_home_kejian_01,
                 onClick = { onCoursewareClick(1) },
             )
             FeatureCard(
                 modifier = Modifier
                     .weight(1f)
-                    .focusProperties { up = cadreAppointmentFocusRequester },
+                    .focusProperties { up = partyBuildingFocusRequester },
                 image = R.drawable.ic_home_kejian_02,
                 onClick = { onCoursewareClick(2) },
             )
             FeatureCard(
                     modifier = Modifier
                         .weight(1f)
-                        .focusProperties { up = cadreAppointmentFocusRequester },
+                        .focusProperties { up = partyBuildingFocusRequester },
             image = R.drawable.ic_home_kejian_03,
             onClick = { onCoursewareClick(3) },
             )
@@ -1325,12 +1479,6 @@ private fun FocusableTile(
 private fun formatDuration(milliseconds: Long): String {
     val seconds = (milliseconds / 1_000L).coerceAtLeast(0L)
     return "%02d:%02d".format(seconds / 60L, seconds % 60L)
-}
-
-private tailrec fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> null
 }
 
 @Preview(

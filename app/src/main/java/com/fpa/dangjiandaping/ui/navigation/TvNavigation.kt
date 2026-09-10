@@ -19,6 +19,8 @@ private val party_URL = "${BASE_URL}party"
 internal sealed interface TvTabDestination {
     data object NativeHome : TvTabDestination
 
+    data object AndmuDevices : TvTabDestination
+
     data class Web(val url: String) : TvTabDestination
 }
 
@@ -29,6 +31,11 @@ internal sealed interface TvRoute : NavKey
 internal data object HomeRoute : TvRoute
 
 @Serializable
+internal data class AndmuDevicesRoute(
+    val tabIndex: Int,
+) : TvRoute
+
+@Serializable
 internal data class WebRoute(
     val tabIndex: Int,
     val url: String,
@@ -36,6 +43,7 @@ internal data class WebRoute(
 
 internal fun TvTabDestination.toRoute(tabIndex: Int): TvRoute = when (this) {
     TvTabDestination.NativeHome -> HomeRoute
+    TvTabDestination.AndmuDevices -> AndmuDevicesRoute(tabIndex)
     is TvTabDestination.Web -> WebRoute(tabIndex = tabIndex, url = url)
 }
 
@@ -70,5 +78,6 @@ internal val TV_TABS = listOf(
     TvTabSpec("阵地库", 0.80f, TvTabDestination.Web(NAV_BASE_URL)),
     TvTabSpec("课件库", 0.80f, TvTabDestination.Web(courseware_URL)),
     TvTabSpec("基层党建", 0.80f, TvTabDestination.Web(jicengdangjian_URL)),
-    TvTabSpec("我的党支部", 1.10f, TvTabDestination.Web(party_URL))
+    TvTabSpec("我的党支部", 1.10f, TvTabDestination.Web(party_URL)),
+    TvTabSpec("千里眼", 0.80f, TvTabDestination.AndmuDevices),
 )
