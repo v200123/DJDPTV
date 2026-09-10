@@ -7,19 +7,25 @@ import android.media.AudioManager
 import android.media.ToneGenerator
 import android.view.SoundEffectConstants
 import android.webkit.WebView
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.togetherWith
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.focusable
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
@@ -29,16 +35,22 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
@@ -50,6 +62,7 @@ import androidx.navigation3.ui.NavDisplay
 import androidx.tv.material3.MaterialTheme
 import com.fpa.dangjiandaping.R
 import com.fpa.dangjiandaping.ui.MainContentHorizontalPadding
+import com.fpa.dangjiandaping.ui.focus.focusOnClick
 import com.fpa.dangjiandaping.ui.header.NativeHeader
 import com.fpa.dangjiandaping.ui.header.rememberTvTabFocusRequesters
 import com.fpa.dangjiandaping.ui.home.HomeScreen
@@ -70,6 +83,7 @@ import kotlinx.coroutines.delay
 import kotlin.random.Random
 
 private const val HOME_TAB_INDEX = 0
+private const val MEETING_PACKAGE_NAME = "com.starnet.vsdkserver"
 private const val MOCK_HELP_MIN_DELAY_MILLIS = 5_000L
 private const val MOCK_HELP_MAX_DELAY_MILLIS = 12_001L
 private const val CLEAR_WEB_DOM_FOCUS_SCRIPT =
@@ -101,6 +115,8 @@ fun DangJianTvScreen(
 
     val tabFocusRequesters = rememberTvTabFocusRequesters()
     val contentFocusRequester = remember { FocusRequester() }
+    val meetingFocusRequester = remember { FocusRequester() }
+    val lastCoursewareFocusRequester = remember { FocusRequester() }
     val rootView = LocalView.current
     val context = LocalContext.current
     val activity = remember(context) { context.findActivity() }
@@ -329,6 +345,8 @@ fun DangJianTvScreen(
                             modifier = Modifier.fillMaxSize(),
                             partyStats = partyStats,
                             contentFocusRequester = contentFocusRequester,
+                            meetingFocusRequester = meetingFocusRequester,
+                            lastCoursewareFocusRequester = lastCoursewareFocusRequester,
                             onRequestTabFocus = ::requestSelectedTabFocus,
                             onCoursewareClick = ::openCourseware,
                             onPartyBuildingClick = ::openPartyBuilding,
@@ -373,12 +391,73 @@ fun DangJianTvScreen(
             )
         }
 
+        MeetingLauncher(
+            context = context,
+            focusRequester = meetingFocusRequester,
+            leftFocusRequester = lastCoursewareFocusRequester,
+            modifier = Modifier
+                .align(Alignment.BottomEnd)
+                .padding(end = 28.dp, bottom = 28.dp),
+        )
+
         publicHelpRequest?.let { request ->
             PublicHelpRequestDialog(
                 request = request,
                 onDismiss = { publicHelpRequest = null },
                 onHandled = { publicHelpRequest = null },
                 onContactLater = { publicHelpRequest = null },
+            )
+        }
+    }
+}
+
+@Composable
+private fun MeetingLauncher(
+    context: Context,
+    focusRequester: FocusRequester,
+    leftFocusRequester: FocusRequester,
+    modifier: Modifier = Modifier,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)
+
+    Box(
+        modifier = modifier
+            .clip(shape)
+            .background(if (focused) Color(0xFFF6CD8B) else Color(0xD92A376B))
+            .border(
+                width = if (focused) 2.dp else 1.dp,
+                color = if (focused) Color.White else Color(0xCCF6CD8B),
+                shape = shape,
+            )
+            .onFocusChanged { focused = it.isFocused }
+            .focusProperties { left = leftFocusRequester }
+            .focusRequester(focusRequester)
+            .focusOnClick(focusRequester)
+            .clickable {
+                focusRequester.requestFocus()
+                val launchIntent = context.packageManager
+                    .getLaunchIntentForPackage(MEETING_PACKAGE_NAME)
+                if (launchIntent != null) {
+                    context.startActivity(launchIntent)
+                } else {
+                    Toast.makeText(context, "未安装会议应用", Toast.LENGTH_SHORT).show()
+                }
+            }
+            .focusable()
+            .padding(horizontal = 20.dp, vertical = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            androidx.tv.material3.Text(
+                text = "会议",
+                color = if (focused) Color(0xFF263A71) else Color.White,
+                fontWeight = FontWeight.Bold,
+            )
+            androidx.tv.material3.Text(
+                text = " >",
+                color = if (focused) Color(0xFF263A71) else Color(0xFFF6CD8B),
+                fontWeight = FontWeight.Bold,
             )
         }
     }

@@ -141,6 +141,8 @@ internal fun HomeScreen(
     videoUrl: String = DEFAULT_HOME_VIDEO_URL,
     partyStats: List<PartyStat> = defaultPartyStats,
     contentFocusRequester: FocusRequester? = null,
+    meetingFocusRequester: FocusRequester? = null,
+    lastCoursewareFocusRequester: FocusRequester? = null,
     onRequestTabFocus: () -> Unit = {},
     onCoursewareClick: (Int) -> Unit = {},
     onPartyBuildingClick: (Int) -> Unit = {},
@@ -233,6 +235,8 @@ internal fun HomeScreen(
                 )
                 CoursewarePanel(
                     cadreAppointmentFocusRequester = cadreAppointmentFocusRequester,
+                    meetingFocusRequester = meetingFocusRequester,
+                    lastCoursewareFocusRequester = lastCoursewareFocusRequester,
                     onCoursewareClick = onCoursewareClick,
                     modifier = Modifier
                         .weight(1.08f)
@@ -1188,6 +1192,8 @@ private fun FeatureCard(
 @Composable
 private fun CoursewarePanel(
     cadreAppointmentFocusRequester: FocusRequester,
+    meetingFocusRequester: FocusRequester?,
+    lastCoursewareFocusRequester: FocusRequester?,
     onCoursewareClick: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -1213,11 +1219,23 @@ private fun CoursewarePanel(
                 onClick = { onCoursewareClick(2) },
             )
             FeatureCard(
-                    modifier = Modifier
-                        .weight(1f)
-                        .focusProperties { up = cadreAppointmentFocusRequester },
-            image = R.drawable.ic_home_kejian_03,
-            onClick = { onCoursewareClick(3) },
+                modifier = Modifier
+                    .weight(1f)
+                    .then(
+                        if (lastCoursewareFocusRequester != null) {
+                            Modifier.focusRequester(lastCoursewareFocusRequester)
+                        } else {
+                            Modifier
+                        },
+                    )
+                    .focusProperties {
+                        up = cadreAppointmentFocusRequester
+                        if (meetingFocusRequester != null) {
+                            right = meetingFocusRequester
+                        }
+                    },
+                image = R.drawable.ic_home_kejian_03,
+                onClick = { onCoursewareClick(3) },
             )
 
 //            CourseCard(
