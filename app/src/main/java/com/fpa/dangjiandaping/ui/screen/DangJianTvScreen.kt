@@ -370,6 +370,7 @@ fun DangJianTvScreen(
                         AndmuDeviceScreen(
                             active = currentRoute == route && publicHelpRequest == null,
                             contentFocusRequester = contentFocusRequester,
+                            onRequestTabFocus = ::requestSelectedTabFocus,
                             modifier = Modifier
                                 .fillMaxSize()
                                 .padding(top = 8.dp, bottom = 10.dp),
