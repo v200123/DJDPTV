@@ -2,6 +2,7 @@ package com.fpa.dangjiandaping.ui.andmu
 
 import android.graphics.BitmapFactory
 import android.widget.ImageView
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -9,16 +10,17 @@ import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.itemsIndexed
+import androidx.compose.foundation.lazy.grid.rememberLazyGridState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -75,8 +77,16 @@ internal fun AndmuDeviceScreen(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val firstItemFocusRequester = remember { FocusRequester() }
+    val deviceGridState = rememberLazyGridState()
     val deviceUiState by AndmuDeviceStore.state.collectAsState()
     var contentHasFocus by remember { mutableStateOf(false) }
+    var firstRowHasFocus by remember { mutableStateOf(false) }
+    var focusedColumn by remember { mutableStateOf(0) }
+    val firstRowFocusRequesters = remember(deviceUiState.cameras) {
+        List(minOf(DEVICE_GRID_COLUMNS, deviceUiState.cameras.size)) { index ->
+            if (index == 0) firstItemFocusRequester else FocusRequester()
+        }
+    }
     var playerErrorMessage by remember { mutableStateOf<String?>(null) }
     var openingDeviceId by remember { mutableStateOf<String?>(null) }
 
@@ -96,6 +106,21 @@ internal fun AndmuDeviceScreen(
         }
     }
 
+    BackHandler(
+        enabled = active && contentHasFocus && deviceUiState.cameras.isNotEmpty(),
+    ) {
+        if (firstRowHasFocus) {
+            onRequestTabFocus()
+        } else {
+            scope.launch {
+                deviceGridState.animateScrollToItem(index = focusedColumn)
+                withFrameNanos { }
+                (firstRowFocusRequesters.getOrNull(focusedColumn) ?: firstItemFocusRequester)
+                    .requestFocus(FocusDirection.Up)
+            }
+        }
+    }
+
     Box(
         modifier = modifier
             .focusRequester(contentFocusRequester)
@@ -109,9 +134,14 @@ internal fun AndmuDeviceScreen(
     ) {
         AndmuDeviceContent(
             deviceUiState = deviceUiState,
-            firstItemFocusRequester = firstItemFocusRequester,
+            gridState = deviceGridState,
+            firstRowFocusRequesters = firstRowFocusRequesters,
             openingDeviceId = openingDeviceId,
-            onFirstItemUp = onRequestTabFocus,
+            onFirstRowUp = onRequestTabFocus,
+            onFirstRowFocusChanged = { firstRow, column ->
+                firstRowHasFocus = firstRow
+                focusedColumn = column
+            },
             onOpenDevice = { item ->
                 if (openingDeviceId == null) {
                     openingDeviceId = item.device.deviceId
@@ -154,30 +184,37 @@ internal fun AndmuDeviceScreen(
 @Composable
 private fun AndmuDeviceContent(
     deviceUiState: AndmuDeviceUiState,
-    firstItemFocusRequester: FocusRequester,
+    gridState: LazyGridState,
+    firstRowFocusRequesters: List<FocusRequester>,
     openingDeviceId: String?,
-    onFirstItemUp: () -> Unit,
+    onFirstRowUp: () -> Unit,
+    onFirstRowFocusChanged: (Boolean, Int) -> Unit,
     onOpenDevice: (AndmuCameraItem) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     when {
-        deviceUiState.cameras.isNotEmpty() -> LazyColumn(
+        deviceUiState.cameras.isNotEmpty() -> LazyVerticalGrid(
+            columns = GridCells.Fixed(DEVICE_GRID_COLUMNS),
+            state = gridState,
             modifier = modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             itemsIndexed(
                 items = deviceUiState.cameras,
                 key = { _, item -> item.device.deviceId },
             ) { index, item ->
-                val itemFocusRequester =
-                    if (index == 0) firstItemFocusRequester else remember { FocusRequester() }
+                val itemFocusRequester = firstRowFocusRequesters.getOrNull(index)
+                    ?: remember { FocusRequester() }
                 AndmuCameraCard(
                     item = item,
                     focusRequester = itemFocusRequester,
-                    first = index == 0,
+                    firstRow = index < DEVICE_GRID_COLUMNS,
+                    column = index % DEVICE_GRID_COLUMNS,
                     last = index == deviceUiState.cameras.lastIndex,
                     opening = openingDeviceId == item.device.deviceId,
-                    onFirstItemUp = onFirstItemUp,
+                    onFirstRowUp = onFirstRowUp,
+                    onFirstRowFocusChanged = onFirstRowFocusChanged,
                     onOpen = { onOpenDevice(item) },
                 )
             }
@@ -193,28 +230,33 @@ private fun AndmuDeviceContent(
 private fun AndmuCameraCard(
     item: AndmuCameraItem,
     focusRequester: FocusRequester,
-    first: Boolean,
+    firstRow: Boolean,
+    column: Int,
     last: Boolean,
     opening: Boolean,
-    onFirstItemUp: () -> Unit,
+    onFirstRowUp: () -> Unit,
+    onFirstRowFocusChanged: (Boolean, Int) -> Unit,
     onOpen: () -> Unit,
 ) {
     var focused by remember { mutableStateOf(false) }
     var confirmPressed by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(14.dp)
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .height(116.dp)
+            .height(DEVICE_CARD_HEIGHT)
             .focusRequester(focusRequester)
             .logFocusTarget("Andmu.Device[${item.device.deviceId}]")
             .focusOnClick(focusRequester)
             .focusProperties {
-                if (first) up = FocusRequester.Cancel
+                if (firstRow) up = FocusRequester.Cancel
                 if (last) down = FocusRequester.Cancel
             }
             .onFocusChanged {
                 focused = it.isFocused
+                if (it.isFocused) {
+                    onFirstRowFocusChanged(firstRow, column)
+                }
                 if (!it.isFocused) confirmPressed = false
             }
             .clip(shape)
@@ -226,8 +268,8 @@ private fun AndmuCameraCard(
             )
             .onPreviewKeyEvent { event ->
                 when {
-                    first && event.key == Key.DirectionUp -> {
-                        if (event.type == KeyEventType.KeyDown) onFirstItemUp()
+                    firstRow && event.key == Key.DirectionUp -> {
+                        if (event.type == KeyEventType.KeyDown) onFirstRowUp()
                         true
                     }
 
@@ -250,42 +292,57 @@ private fun AndmuCameraCard(
                 focusRequester.requestFocus()
                 onOpen()
             }
-            .focusable()
-            .padding(10.dp),
-        verticalAlignment = Alignment.CenterVertically,
+            .focusable(),
     ) {
-        RealtimeThumbnail(
-            url = item.thumbnailUrl,
+        Box(
             modifier = Modifier
-                .width(166.dp)
-                .height(94.dp)
-                .clip(RoundedCornerShape(8.dp))
-                .border(
-                    width = 1.dp,
-                    color = ThumbnailBorderColor,
-                    shape = RoundedCornerShape(8.dp),
-                ),
-        )
-        Spacer(Modifier.width(18.dp))
+                .fillMaxWidth()
+                .height(DEVICE_THUMBNAIL_HEIGHT),
+        ) {
+            RealtimeThumbnail(
+                url = item.thumbnailUrl,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .border(
+                        width = 1.dp,
+                        color = ThumbnailBorderColor,
+                    ),
+            )
+            Box(
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(8.dp)
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(PlayButtonColor)
+                    .border(1.dp, ThumbnailBorderColor, CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text("▶", color = TitleColor, fontSize = 11.sp)
+            }
+        }
         Column(
-            modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.Center,
+            modifier = Modifier
+                .fillMaxWidth()
+                .weight(1f)
+                .background(CardFooterColor)
+                .padding(horizontal = 10.dp, vertical = 6.dp),
+            verticalArrangement = Arrangement.SpaceBetween,
         ) {
             Text(
                 text = item.device.deviceName.ifBlank { "未命名摄像机" },
                 color = TitleColor,
-                fontSize = 18.sp,
+                fontSize = 14.sp,
                 maxLines = 1,
             )
-            Spacer(Modifier.height(8.dp))
             Text(
                 text = if (opening) {
                     "正在获取实时画面…"
                 } else {
-                    "在线  ·  ${item.device.deviceAddress.ifBlank { "" }}"
+                    "地址：${item.device.deviceAddress.ifBlank { "" }}"
                 },
                 color = SubtitleColor,
-                fontSize = 13.sp,
+                fontSize = 9.sp,
                 maxLines = 1,
             )
         }
@@ -353,6 +410,46 @@ private val PreviewCameras = listOf(
             deviceStatus = 1,
         ),
     ),
+    AndmuCameraItem(
+        device = AndmuDevice(
+            deviceId = "preview-camera-4",
+            deviceName = "红色文化教育基地摄像机",
+            deviceAddress = "成都市锦江区",
+            deviceStatus = 1,
+        ),
+    ),
+    AndmuCameraItem(
+        device = AndmuDevice(
+            deviceId = "preview-camera-5",
+            deviceName = "党员活动室摄像机",
+            deviceAddress = "成都市青羊区",
+            deviceStatus = 1,
+        ),
+    ),
+    AndmuCameraItem(
+        device = AndmuDevice(
+            deviceId = "preview-camera-6",
+            deviceName = "社区服务中心摄像机",
+            deviceAddress = "成都市金牛区",
+            deviceStatus = 1,
+        ),
+    ),
+    AndmuCameraItem(
+        device = AndmuDevice(
+            deviceId = "preview-camera-7",
+            deviceName = "乡村振兴直播间摄像机",
+            deviceAddress = "成都市双流区",
+            deviceStatus = 1,
+        ),
+    ),
+    AndmuCameraItem(
+        device = AndmuDevice(
+            deviceId = "preview-camera-8",
+            deviceName = "党群驿站摄像机",
+            deviceAddress = "成都市新都区",
+            deviceStatus = 1,
+        ),
+    ),
 )
 
 @Preview(
@@ -375,9 +472,13 @@ private fun AndmuDeviceContentPreview() {
     ) {
         AndmuDeviceContent(
             deviceUiState = AndmuDeviceUiState(cameras = PreviewCameras),
-            firstItemFocusRequester = firstItemFocusRequester,
+            gridState = rememberLazyGridState(),
+            firstRowFocusRequesters = List(DEVICE_GRID_COLUMNS) { index ->
+                if (index == 0) firstItemFocusRequester else FocusRequester()
+            },
             openingDeviceId = PreviewCameras[1].device.deviceId,
-            onFirstItemUp = {},
+            onFirstRowUp = {},
+            onFirstRowFocusChanged = { _, _ -> },
             onOpenDevice = {},
         )
     }
@@ -391,6 +492,7 @@ private fun AndmuDeviceContentPreview() {
 )
 @Composable
 private fun AndmuDeviceEmptyPreview() {
+    val firstItemFocusRequester = remember { FocusRequester() }
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -398,9 +500,11 @@ private fun AndmuDeviceEmptyPreview() {
     ) {
         AndmuDeviceContent(
             deviceUiState = AndmuDeviceUiState(hasLoaded = true),
-            firstItemFocusRequester = remember { FocusRequester() },
+            gridState = rememberLazyGridState(),
+            firstRowFocusRequesters = listOf(firstItemFocusRequester),
             openingDeviceId = null,
-            onFirstItemUp = {},
+            onFirstRowUp = {},
+            onFirstRowFocusChanged = { _, _ -> },
             onOpenDevice = {},
         )
     }
@@ -408,13 +512,18 @@ private fun AndmuDeviceEmptyPreview() {
 
 private val ConfirmKeys = setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
 private const val DEVICE_LIST_REFRESH_INTERVAL_MILLIS = 60_000L
+private const val DEVICE_GRID_COLUMNS = 4
+private val DEVICE_CARD_HEIGHT = 164.dp
+private val DEVICE_THUMBNAIL_HEIGHT = 110.dp
 // 与党建红主界面的文章列表一致：卡片透出页面背景，焦点使用金色描边。
 private val CardColor = androidx.compose.ui.graphics.Color(0xB8B8171C)
 private val FocusedCardColor = androidx.compose.ui.graphics.Color(0xD6A90E18)
+private val CardFooterColor = androidx.compose.ui.graphics.Color(0xD06E0000)
 private val CardBorderColor = androidx.compose.ui.graphics.Color(0x45FFD896)
 private val FocusBorderColor = androidx.compose.ui.graphics.Color(0xFFFFD889)
 private val ThumbnailPlaceholderColor = androidx.compose.ui.graphics.Color(0x993F080C)
 private val ThumbnailBorderColor = androidx.compose.ui.graphics.Color(0x66FFD896)
+private val PlayButtonColor = androidx.compose.ui.graphics.Color(0xB8000000)
 private val TitleColor = androidx.compose.ui.graphics.Color(0xFFFFF0D4)
 private val SubtitleColor = androidx.compose.ui.graphics.Color(0xD6FFD39B)
 private val PreviewBackgroundColor = androidx.compose.ui.graphics.Color(0xFFB80912)

@@ -77,12 +77,17 @@ fun NativeHeader(
     onTabFocused: (Int) -> Unit,
     onTabSelected: (Int) -> Unit,
     onTabDown: (Int) -> Unit,
+    onMeetingClick: () -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val meetingFocusRequester = remember { FocusRequester() }
     Column(
         modifier = modifier
     ) {
         HeaderBrandRow(
+            meetingFocusRequester = meetingFocusRequester,
+            returnFocusRequester = tabFocusRequesters[focusedTab],
+            onMeetingClick = onMeetingClick,
             modifier = Modifier
                 .fillMaxWidth()
         )
@@ -94,6 +99,7 @@ fun NativeHeader(
             onTabFocused = onTabFocused,
             onTabSelected = onTabSelected,
             onTabDown = onTabDown,
+            meetingFocusRequester = meetingFocusRequester,
             modifier = Modifier
                 .fillMaxWidth()
         )
@@ -101,17 +107,80 @@ fun NativeHeader(
 }
 
 @Composable
-private fun HeaderBrandRow(modifier: Modifier = Modifier) {
+private fun HeaderBrandRow(
+    meetingFocusRequester: FocusRequester,
+    returnFocusRequester: FocusRequester,
+    onMeetingClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
     Box(
         modifier = modifier,
         contentAlignment = Alignment.TopEnd
     ) {
         Image(painterResource(R.drawable.ic_app_left_logo), contentScale = ContentScale.Fit, contentDescription = "",
             modifier = Modifier.align(Alignment.TopStart))
-        Column(horizontalAlignment = Alignment.End, modifier = Modifier.offset(0.dp,10.dp)) {
-            Text("中共甘孜州委组织部", color = Color(0xFFFFD186), fontSize = 12.sp)
-            Text(currentDateText(), color = Color(0xFFFFD186), fontSize = 10.sp)
+        Row(
+            modifier = Modifier.offset(y = 10.dp),
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            MeetingButton(
+                focusRequester = meetingFocusRequester,
+                returnFocusRequester = returnFocusRequester,
+                onClick = onMeetingClick,
+            )
+            Column(horizontalAlignment = Alignment.End) {
+                Text("中共甘孜州委组织部", color = Color(0xFFFFD186), fontSize = 12.sp)
+                Text(currentDateText(), color = Color(0xFFFFD186), fontSize = 10.sp)
+            }
         }
+    }
+}
+
+@Composable
+private fun MeetingButton(
+    focusRequester: FocusRequester,
+    returnFocusRequester: FocusRequester,
+    onClick: () -> Unit,
+) {
+    var focused by remember { mutableStateOf(false) }
+    val shape = RoundedCornerShape(4.dp)
+    Box(
+        modifier = Modifier
+            .size(28.dp)
+            .then(
+                if (focused) {
+                    Modifier
+                        .background(Color(0x66C8362D), shape)
+                        .border(2.dp, Color(0xFFFFD889), shape)
+                } else {
+                    Modifier
+                },
+            )
+            .focusRequester(focusRequester)
+            .logFocusTarget("Header.Meeting")
+            .focusProperties {
+                up = FocusRequester.Cancel
+                down = returnFocusRequester
+                left = FocusRequester.Cancel
+                right = FocusRequester.Cancel
+            }
+            .onFocusChanged { focused = it.isFocused }
+            .focusOnClick(focusRequester)
+            .selectable(
+                selected = false,
+                interactionSource = null,
+                onClick = onClick,
+                role = Role.Button,
+                indication = null,
+            ),
+        contentAlignment = Alignment.Center,
+    ) {
+        Image(
+            painter = painterResource(R.drawable.ic_header_meeting),
+            contentDescription = "会议",
+            modifier = Modifier.size(19.dp),
+        )
     }
 }
 
@@ -132,6 +201,7 @@ private fun HeaderTabRow(
     onTabFocused: (Int) -> Unit,
     onTabSelected: (Int) -> Unit,
     onTabDown: (Int) -> Unit,
+    meetingFocusRequester: FocusRequester,
     modifier: Modifier = Modifier
 ) {
     var tabRowHasFocus by remember { mutableStateOf(false) }
@@ -152,12 +222,16 @@ private fun HeaderTabRow(
                     .logFocusTarget("Header.Tab[$index:${tab.title}]")
                     .focusOnClick(tabFocusRequesters[index])
                     .focusProperties {
-                        up = FocusRequester.Cancel
+                        up = meetingFocusRequester
                         if (index == 0) {
                             left = FocusRequester.Cancel
+                        } else {
+                            left = tabFocusRequesters[index - 1]
                         }
                         if (index == TV_TABS.lastIndex) {
                             right = FocusRequester.Cancel
+                        } else {
+                            right = tabFocusRequesters[index + 1]
                         }
                     }
                     .onFocusChanged { focusState ->
@@ -373,6 +447,7 @@ private fun NativeHeaderPreview() {
                 selectedTab = it
                 focusedTab = it
             },
+            onMeetingClick = {},
             modifier = Modifier.fillMaxSize()
         )
     }

@@ -92,6 +92,10 @@ private const val DEFAULT_HOME_VIDEO_URL = "https://vod.scycjy.gov.cn/20260729/e
 private const val PARTY_PIONEER_MOBILE_URL = "https://12371.people.com.cn/"
 private const val PARTY_MEMBER_LEARNING_URL = "https://www.scycjy.gov.cn/dyxx_mys.html"
 private const val KANGBA_PARTY_FLAG_URL = "https://www.scycjy.gov.cn/scdjw/2026wsdy.html"//专题专栏第三个选择
+private const val WORK_DYNAMICS_DETAIL_URL_PREFIX = "https://www.xyxf.gov.cn/#/index/details?id="
+private const val WORK_DYNAMICS_DETAIL_URL_SUFFIX = "&details=true&name=%E7%BB%84%E5%B7%A5%E5%8A%A8%E6%80%81"
+private const val PIONEER_COMMENTARY_DETAIL_URL = "https://www.xyxf.gov.cn/#/index/details?id=2097918339568496642&name=%E9%9B%AA%E5%9F%9F%E5%85%88%E9%94%8B%E6%97%B6%E8%AF%84"
+private val PARTY_WORK_TAB_WIDTH = 96.dp
 private val Gold = Color(0xFFFFD889)
 private val BrightGold = Color(0xFFFFD186)
 private val PanelRed = Color(0xB078101B)
@@ -716,7 +720,7 @@ private fun RuntimeVideoPlayer(
                 )
             },
             primaryControlFocusRequester = playFocusRequester,
-            primaryControlRightFocusRequester = rightFocusRequester,
+            primaryControlRightFocusRequester = fullscreenFocusRequester,
             fullscreenFocusRequester = fullscreenFocusRequester,
             fullscreenRightFocusRequester = rightFocusRequester,
             modifier = Modifier.align(Alignment.BottomCenter),
@@ -1012,6 +1016,7 @@ private fun PartyWorkPanel(
                     id = article.id,
                     title = article.title,
                     publishedAt = article.publishedAt,
+                    detailUrl = selectedCategory.detailUrl(article.id),
                 )
             }
             .ifEmpty {
@@ -1152,13 +1157,13 @@ private fun PartyWorkTab(
                 onClick()
             }
             .focusable()
-            .padding(horizontal = 14.dp),
+            .padding(horizontal = 10.dp),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = category.label,
             color = if (selected) Color(0xFF8C251D) else Color(0xFFF8D7C8),
-            fontSize = 11.sp,
+            fontSize = 10.sp,
             fontWeight = FontWeight.Bold,
             maxLines = 1,
         )
@@ -1276,9 +1281,16 @@ private data class PartyWorkDisplayItem(
     val id: String? = null,
     val title: String,
     val publishedAt: String,
+    val detailUrl: String? = null,
 )
 
 private const val PARTY_WORK_VISIBLE_COUNT = 3
+
+private fun PartyWorkCategory.detailUrl(articleId: String): String = when (this) {
+    PartyWorkCategory.WorkDynamics ->
+        WORK_DYNAMICS_DETAIL_URL_PREFIX + Uri.encode(articleId) + WORK_DYNAMICS_DETAIL_URL_SUFFIX
+    PartyWorkCategory.PioneerCommentary -> PIONEER_COMMENTARY_DETAIL_URL
+}
 
 @Composable
 private fun PartyPanelFocusableItem(

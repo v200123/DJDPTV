@@ -7,7 +7,6 @@ import kotlinx.serialization.Serializable
 private val BASE_URL = BuildConfig.BASE_URL
 
 private val HOME_WEB_URL = BASE_URL
-private val PARTY_MEMBER_URL = "${BASE_URL}find-party-member"
 private val kangba_URL = "${BASE_URL}kangba"
 private val teacher_URL = "${BASE_URL}teacher"
 private val NAV_BASE_URL = "${BASE_URL}base"
@@ -48,14 +47,18 @@ internal fun TvTabDestination.toRoute(tabIndex: Int): TvRoute = when (this) {
 }
 
 internal fun partyBuildingRoute(channelId: Int): WebRoute = WebRoute(
-    tabIndex = 6,
+    tabIndex = partyBuildingTabIndex(),
     url = "$jicengdangjian_URL?id=$channelId",
 )
 
 internal fun coursewareRoute(type: Int): WebRoute = WebRoute(
-    tabIndex = 5,
+    tabIndex = coursewareTabIndex(),
     url = "$courseware_URL?type=$type",
 )
+
+internal fun partyBuildingTabIndex(): Int = tabIndexForWebUrl(jicengdangjian_URL)
+
+internal fun coursewareTabIndex(): Int = tabIndexForWebUrl(courseware_URL)
 
 internal data class TvTabSpec(
     val title: String,
@@ -81,3 +84,9 @@ internal val TV_TABS = listOf(
     TvTabSpec("我的党支部", 1.10f, TvTabDestination.Web(party_URL)),
 //    TvTabSpec("千里眼", 0.80f, TvTabDestination.AndmuDevices),
 )
+
+private fun tabIndexForWebUrl(url: String): Int = TV_TABS.indexOfFirst { tab ->
+    (tab.destination as? TvTabDestination.Web)?.url == url
+}.also { index ->
+    check(index >= 0) { "Missing TV tab for URL: $url" }
+}
