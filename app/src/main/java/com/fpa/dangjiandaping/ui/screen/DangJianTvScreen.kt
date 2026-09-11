@@ -7,6 +7,7 @@ import android.media.AudioManager
 import android.media.ToneGenerator
 import android.view.SoundEffectConstants
 import android.webkit.WebView
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExitTransition
@@ -57,9 +58,11 @@ import com.fpa.dangjiandaping.ui.home.HomeScreen
 import com.fpa.dangjiandaping.ui.navigation.HomeRoute
 import com.fpa.dangjiandaping.ui.navigation.AndmuDevicesRoute
 import com.fpa.dangjiandaping.ui.navigation.TV_TABS
+import com.fpa.dangjiandaping.ui.navigation.TvTabDestination
 import com.fpa.dangjiandaping.ui.navigation.TvRoute
 import com.fpa.dangjiandaping.ui.navigation.WebRoute
 import com.fpa.dangjiandaping.ui.navigation.coursewareRoute
+import com.fpa.dangjiandaping.ui.navigation.partyBuildingTabIndex
 import com.fpa.dangjiandaping.ui.navigation.partyBuildingRoute
 import com.fpa.dangjiandaping.ui.navigation.toRoute
 import com.fpa.dangjiandaping.ui.web.PublicHelpRequest
@@ -77,6 +80,7 @@ private const val CLEAR_WEB_DOM_FOCUS_SCRIPT =
         "if(el&&el!==document.body&&el!==document.documentElement&&" +
         "typeof el.blur==='function'){el.blur();}" +
         "return true;})();"
+private const val MEETING_PACKAGE_NAME = "com.starnet.vsdkserver"
 
 @Composable
 fun DangJianTvScreen(
@@ -86,7 +90,9 @@ fun DangJianTvScreen(
     val currentRoute = (backStack.lastOrNull() as? TvRoute) ?: HomeRoute
     val selectedTab = when (currentRoute) {
         HomeRoute -> HOME_TAB_INDEX
-        is AndmuDevicesRoute -> currentRoute.tabIndex
+        is AndmuDevicesRoute -> TV_TABS.indexOfFirst { tab ->
+            tab.destination is TvTabDestination.AndmuDevices
+        }
         is WebRoute -> currentRoute.tabIndex
     }
 
@@ -151,21 +157,35 @@ fun DangJianTvScreen(
     }
 
     fun openPartyBuilding(channelId: Int) {
+        val targetRoute = partyBuildingRoute(channelId)
         activateRoute(
-            tabIndex = 6,
-            targetRoute = partyBuildingRoute(channelId),
+            tabIndex = targetRoute.tabIndex,
+            targetRoute = targetRoute,
             moveFocusToContent = false,
         )
-        pendingTabFocusIndex = 6
+        pendingTabFocusIndex = targetRoute.tabIndex
     }
 
     fun openCourseware(type: Int) {
+        val targetRoute = coursewareRoute(type)
         activateRoute(
-            tabIndex = 5,
-            targetRoute = coursewareRoute(type),
+            tabIndex = targetRoute.tabIndex,
+            targetRoute = targetRoute,
             moveFocusToContent = false,
         )
-        pendingTabFocusIndex = 5
+        pendingTabFocusIndex = targetRoute.tabIndex
+    }
+
+    fun launchMeeting() {
+        val meetingIntent = context.packageManager.getLaunchIntentForPackage(MEETING_PACKAGE_NAME)
+        if (meetingIntent == null) {
+            Toast.makeText(context, "未安装会议应用", Toast.LENGTH_SHORT).show()
+            return
+        }
+        runCatching { context.startActivity(meetingIntent) }
+            .onFailure {
+                Toast.makeText(context, "无法打开会议应用", Toast.LENGTH_SHORT).show()
+            }
     }
 
     fun handleBack() {
@@ -301,6 +321,7 @@ fun DangJianTvScreen(
                 },
                 onTabSelected = { tabIndex -> activateTab(tabIndex, moveFocusToContent = false) },
                 onTabDown = { tabIndex -> activateTab(tabIndex, moveFocusToContent = true) },
+                onMeetingClick = ::launchMeeting,
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = MainContentHorizontalPadding)
@@ -328,7 +349,9 @@ fun DangJianTvScreen(
                             contentFocusRequester = contentFocusRequester,
                             onRequestTabFocus = ::requestSelectedTabFocus,
                             onCoursewareClick = ::openCourseware,
-                            onPartyBuildingTabClick = { activateTab(6, moveFocusToContent = false) },
+                            onPartyBuildingTabClick = {
+                                activateTab(partyBuildingTabIndex(), moveFocusToContent = false)
+                            },
                         )
                     }
                     entry<WebRoute> { route ->

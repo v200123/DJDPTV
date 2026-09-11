@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -101,32 +102,31 @@ internal fun WebViewDialog(
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxSize(0.75f)
+                    .fillMaxSize(0.8f)
                     .tvDialogPanel(RoundedCornerShape(12.dp))
-                    .padding(horizontal = 24.dp, vertical = 20.dp),
+                    .padding(horizontal = 24.dp, vertical = 12.dp),
             ) {
                 Row(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(52.dp),
+                        .fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Text(
                         text = requestedTitle ?: pageTitle.ifBlank { "网页详情" },
                         color = HelpDialogWarmWhite,
-                        fontSize = 23.sp,
+                        fontSize = 15.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f),
                     )
+                    Spacer(modifier = Modifier.width(5.dp))
                     TvDialogCloseButton(
                         onClick = onDismiss,
                         focusRequester = closeFocusRequester,
                     )
                 }
-                Spacer(Modifier.height(14.dp))
-
+                Spacer(Modifier.height(7.dp))
                 AndroidView(
                     modifier = Modifier
                         .fillMaxWidth()

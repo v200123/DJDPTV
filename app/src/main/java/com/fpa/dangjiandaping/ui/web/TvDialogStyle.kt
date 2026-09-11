@@ -65,7 +65,7 @@ internal fun TvDialogCloseButton(
     )
     Box(
         modifier = modifier
-            .size(48.dp)
+            .size(24.dp)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
@@ -86,7 +86,7 @@ internal fun TvDialogCloseButton(
         Text(
             text = "×",
             color = Color.White,
-            fontSize = 31.sp,
+            fontSize = 12.sp,
             fontWeight = FontWeight.Bold,
         )
     }
