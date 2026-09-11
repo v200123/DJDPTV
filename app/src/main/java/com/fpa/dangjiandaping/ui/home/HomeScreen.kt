@@ -162,7 +162,7 @@ internal fun HomeScreen(
                 onExit = {
                     if (requestedFocusDirection == FocusDirection.Up) {
                         onRequestTabFocus()
-                    } else {
+                    } else if (requestedFocusDirection != FocusDirection.Right) {
                         cancelFocusChange()
                     }
                 }

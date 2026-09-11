@@ -53,6 +53,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigationevent.compose.LocalNavigationEventDispatcherOwner
 import androidx.navigationevent.compose.rememberNavigationEventDispatcherOwner
 import androidx.navigation3.runtime.NavKey
@@ -397,7 +398,7 @@ fun DangJianTvScreen(
             leftFocusRequester = lastCoursewareFocusRequester,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
-                .padding(end = 28.dp, bottom = 28.dp),
+                .padding(end = 20.dp, bottom = 20.dp),
         )
 
         publicHelpRequest?.let { request ->
@@ -419,14 +420,14 @@ private fun MeetingLauncher(
     modifier: Modifier = Modifier,
 ) {
     var focused by remember { mutableStateOf(false) }
-    val shape = androidx.compose.foundation.shape.RoundedCornerShape(24.dp)
+    val shape = androidx.compose.foundation.shape.RoundedCornerShape(16.dp)
 
     Box(
         modifier = modifier
             .clip(shape)
             .background(if (focused) Color(0xFFF6CD8B) else Color(0xD92A376B))
             .border(
-                width = if (focused) 2.dp else 1.dp,
+                width = if (focused) 1.5.dp else 1.dp,
                 color = if (focused) Color.White else Color(0xCCF6CD8B),
                 shape = shape,
             )
@@ -445,19 +446,22 @@ private fun MeetingLauncher(
                 }
             }
             .focusable()
-            .padding(horizontal = 20.dp, vertical = 12.dp),
+            .padding(horizontal = 12.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center,
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             androidx.tv.material3.Text(
                 text = "会议",
                 color = if (focused) Color(0xFF263A71) else Color.White,
+                fontSize = 12.sp,
                 fontWeight = FontWeight.Bold,
             )
             androidx.tv.material3.Text(
-                text = " >",
+                text = "›",
                 color = if (focused) Color(0xFF263A71) else Color(0xFFF6CD8B),
+                fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(start = 2.dp),
             )
         }
     }
