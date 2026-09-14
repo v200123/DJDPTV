@@ -120,7 +120,15 @@ private enum class PartyWorkCategory(
         columnId = "2009152698225565697",
         onlyImage = false,
         coverImage = R.drawable.ic_home_xyxf_head,
-    ),
+    );
+
+    fun detailUrl(articleId: String): String = when (this) {
+        WorkDynamics ->
+            "https://www.xyxf.gov.cn/#/index/details?id=$articleId&details=true&name=%E7%BB%84%E5%B7%A5%E5%8A%A8%E6%80%81"
+
+        PioneerCommentary ->
+            "https://www.xyxf.gov.cn/#/index/details?id=$articleId&name=%E9%9B%AA%E5%9F%9F%E5%85%88%E9%94%8B%E6%97%B6%E8%AF%84"
+    }
 }
 
 private sealed interface PartyWorkFeedState {
@@ -293,6 +301,9 @@ internal fun HomeScreen(
                     feedState = partyWorkFeedState,
                     onCategorySelected = { partyWorkCategory = it },
                     onRetry = { partyWorkRetryCategory = partyWorkCategory },
+                    onOpenArticle = { articleId ->
+                        webViewDialogUrl = partyWorkCategory.detailUrl(articleId)
+                    },
                     onMoreClick = onPartyBuildingTabClick,
                     modifier = Modifier
                         .weight(1.08f)
@@ -707,6 +718,7 @@ private fun RuntimeVideoPlayer(
             primaryControlFocusRequester = playFocusRequester,
             primaryControlRightFocusRequester = rightFocusRequester,
             fullscreenFocusRequester = fullscreenFocusRequester,
+            fullscreenRightFocusRequester = rightFocusRequester,
             modifier = Modifier.align(Alignment.BottomCenter),
         )
     }
@@ -761,6 +773,7 @@ private fun VideoControlBar(
     primaryControlFocusRequester: FocusRequester? = null,
     primaryControlRightFocusRequester: FocusRequester? = null,
     fullscreenFocusRequester: FocusRequester? = null,
+    fullscreenRightFocusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier,
 ) {
     val playedFraction = when {
@@ -793,8 +806,10 @@ private fun VideoControlBar(
                     }
                 )
                 .then(
-                    if (primaryControlRightFocusRequester != null) {
-                        Modifier.focusProperties { right = primaryControlRightFocusRequester }
+                    if (fullscreenFocusRequester != null || primaryControlRightFocusRequester != null) {
+                        Modifier.focusProperties {
+                            right = fullscreenFocusRequester ?: primaryControlRightFocusRequester!!
+                        }
                     } else {
                         Modifier
                     }
@@ -826,6 +841,16 @@ private fun VideoControlBar(
                 .then(
                     if (fullscreenFocusRequester != null) {
                         Modifier.focusRequester(fullscreenFocusRequester)
+                    } else {
+                        Modifier
+                    }
+                )
+                .then(
+                    if (primaryControlFocusRequester != null || fullscreenRightFocusRequester != null) {
+                        Modifier.focusProperties {
+                            primaryControlFocusRequester?.let { left = it }
+                            fullscreenRightFocusRequester?.let { right = it }
+                        }
                     } else {
                         Modifier
                     }
@@ -971,6 +996,7 @@ private fun PartyWorkPanel(
     feedState: PartyWorkFeedState,
     onCategorySelected: (PartyWorkCategory) -> Unit,
     onRetry: () -> Unit,
+    onOpenArticle: (String) -> Unit,
     onMoreClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -983,6 +1009,7 @@ private fun PartyWorkPanel(
             .take(PARTY_WORK_VISIBLE_COUNT)
             .map { article ->
                 PartyWorkDisplayItem(
+                    id = article.id,
                     title = article.title,
                     publishedAt = article.publishedAt,
                 )
@@ -1014,6 +1041,7 @@ private fun PartyWorkPanel(
         Spacer(Modifier.height(4.dp))
         Row(
             modifier = Modifier
+                .fillMaxWidth()
                 .height(26.dp)
                 .padding(horizontal = 4.dp),
         ) {
@@ -1026,6 +1054,7 @@ private fun PartyWorkPanel(
                 rightFocusRequester = reviewTabFocusRequester,
                 leftFocusRequester = videoControlFocusRequester,
                 onClick = { onCategorySelected(PartyWorkCategory.WorkDynamics) },
+                modifier = Modifier.width(104.dp),
             )
             PartyWorkTab(
                 category = PartyWorkCategory.PioneerCommentary,
@@ -1036,6 +1065,7 @@ private fun PartyWorkPanel(
                 rightFocusRequester = moreFocusRequester,
                 leftFocusRequester = tabFocusRequester,
                 onClick = { onCategorySelected(PartyWorkCategory.PioneerCommentary) },
+                modifier = Modifier.width(104.dp),
             )
         }
         Spacer(Modifier.height(3.dp))
@@ -1069,6 +1099,8 @@ private fun PartyWorkPanel(
                     onClick = {
                         if (feedState is PartyWorkFeedState.Failed) {
                             onRetry()
+                        } else {
+                            item.id?.let(onOpenArticle)
                         }
                     },
                 )
@@ -1095,11 +1127,12 @@ private fun PartyWorkTab(
     leftFocusRequester: FocusRequester,
     rightFocusRequester: FocusRequester,
     onClick: () -> Unit,
+    modifier: Modifier = Modifier,
 ) {
     var focused by remember { mutableStateOf(false) }
     val shape = RoundedCornerShape(2.dp)
     Box(
-        modifier = Modifier
+        modifier = modifier
             .height(26.dp)
             .background(if (selected) Color(0xFFFFD58B) else Color(0x88EF503B))
             .then(if (focused) Modifier.border(2.dp, Gold, shape) else Modifier)
@@ -1240,6 +1273,7 @@ private fun PartyWorkMoreButton(
 }
 
 private data class PartyWorkDisplayItem(
+    val id: String? = null,
     val title: String,
     val publishedAt: String,
 )
