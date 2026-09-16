@@ -2,7 +2,6 @@ package com.fpa.dangjiandaping.ui.web
 
 import android.annotation.SuppressLint
 import android.graphics.Color
-import android.os.Build
 import android.util.Log
 import android.view.KeyEvent
 import android.view.MotionEvent
@@ -10,7 +9,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
-import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
@@ -40,7 +38,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import com.fpa.dangjiandaping.BuildConfig
+import com.fpa.dangjiandaping.ui.login.LocalBigScreenDeviceLoginResult
 
 private const val FOCUS_LOG_TAG = "FocusTrace"
 private const val WEB_LOG_TAG = "WebContent"
@@ -71,15 +69,19 @@ private const val CLEAR_WEB_DOM_FOCUS_SCRIPT =
         "typeof el.blur==='function'){el.blur();}" +
         "return true;})();"
 
-private class WebFocusBridge(
+internal class WebFocusBridge(
     private val webView: WebView,
-    private val onRequestNativeFocus: () -> Unit,
-    private val onShowNewsDetail: (String) -> Unit,
-    private val onShowServiceTeam: (String) -> Unit,
-    private val onShowPublicHelpRequest: (String) -> Unit,
-    private val onPlayVideo: (String,String) -> Unit,
-    private val onShowWebViewUrl: (String, String?) -> Unit,
+    private val onGetUserJson: () -> String? = { null },
+    private val onRequestNativeFocus: () -> Unit = {},
+    private val onShowNewsDetail: (String) -> Unit = {},
+    private val onShowServiceTeam: (String) -> Unit = {},
+    private val onShowPublicHelpRequest: (String) -> Unit = {},
+    private val onPlayVideo: (String, String) -> Unit = { _, _ -> },
+    private val onShowWebViewUrl: (String, String?) -> Unit = { _, _ -> },
 ) {
+    @JavascriptInterface
+    fun getUserJson(): String? = onGetUserJson()
+
     @JavascriptInterface
     fun requestPreviousTabFocus() {
         Log.d(
@@ -175,6 +177,7 @@ internal fun WebContent(
     onShowPublicHelpRequest: (PublicHelpRequest) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val loginResultJson = LocalBigScreenDeviceLoginResult.current.toH5LoginResultJson()
 //    if (LocalInspectionMode.current) {
 //        WebContentPlaceholder(
 //            message = "网页内容预览区",
@@ -307,13 +310,10 @@ internal fun WebContent(
 //                        WebView.setWebContentsDebuggingEnabled(true)
 //                        Log.i(WEB_LOG_TAG, "WebView remote debugging enabled")
 //                    }
-                    WebView(context).apply {
+                    CommonWebView(context, url, loginResultJson).apply {
                         val scrollStepPx = (72 * resources.displayMetrics.density).toInt()
 
                         webViewHolder[0] = this
-                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                            defaultFocusHighlightEnabled = false
-                        }
                         layoutParams = ViewGroup.LayoutParams(
                             ViewGroup.LayoutParams.MATCH_PARENT,
                             ViewGroup.LayoutParams.MATCH_PARENT
@@ -340,6 +340,7 @@ internal fun WebContent(
                         addJavascriptInterface(
                             WebFocusBridge(
                                 webView = this,
+                                onGetUserJson = { getUserJson() },
                                 onRequestNativeFocus = onRequestNativeFocus,
                                 onShowNewsDetail = { newsJson ->
                                     runCatching { parseNewsDetail(newsJson) }
@@ -434,7 +435,7 @@ internal fun WebContent(
                             ) {
                                 super.onPageStarted(view, url, favicon)
                                 Log.i(WEB_LOG_TAG, "onPageStarted: $url")
-                                loadingUrl = view.tag as? String ?: url
+                                loadingUrl = (view as? CommonWebView)?.requestUrl ?: url
                                 onPageReadyChanged(view, false)
                             }
 
@@ -468,22 +469,9 @@ internal fun WebContent(
                             }
                         }
                         settings.apply {
-                            javaScriptEnabled = true
-                            domStorageEnabled = true
-                            mediaPlaybackRequiresUserGesture = false
-                            mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                            cacheMode = WebSettings.LOAD_DEFAULT
-                            useWideViewPort = true
                             loadWithOverviewMode = false
-                            builtInZoomControls = false
                             displayZoomControls = true
-                            userAgentString = MOBILE_BROWSER_USER_AGENT
-                            setSupportZoom(true)
                         }
-                        isVerticalScrollBarEnabled = true
-                        isScrollbarFadingEnabled = false
-                        scrollBarStyle = View.SCROLLBARS_INSIDE_OVERLAY
-                        tag = url
                         Log.i(WEB_LOG_TAG, "loadUrl(initial): $url")
 
                         loadUrl(url)
@@ -510,11 +498,15 @@ internal fun WebContent(
                     if (!webViewInteractive && view.hasFocus()) {
                         view.clearFocus()
                     }
-                    if (view.tag != url) {
-                        Log.i(WEB_LOG_TAG, "loadUrl(routeChanged): ${view.tag} -> $url")
+                    val commonWebView = view as? CommonWebView
+                    if (commonWebView?.requestUrl != url) {
+                        Log.i(
+                            WEB_LOG_TAG,
+                            "loadUrl(routeChanged): ${commonWebView?.requestUrl} -> $url",
+                        )
                         view.stopLoading()
                         view.clearHistory()
-                        view.tag = url
+                        commonWebView?.updateRequestUrl(url, loginResultJson)
                         loadingUrl = url
                         onCanGoBackChanged(false)
                         view.loadUrl(url)
@@ -522,6 +514,8 @@ internal fun WebContent(
                         Log.i(WEB_LOG_TAG, "loadUrl(emptyWebView): $url")
                         loadingUrl = url
                         view.loadUrl(url)
+                    } else {
+                        commonWebView?.updateLoginResult(loginResultJson)
                     }
                 },
                 onRelease = { view ->

@@ -2,14 +2,12 @@ package com.fpa.dangjiandaping.ui.web
 
 import android.annotation.SuppressLint
 import android.graphics.Color
-import android.os.Build
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
 import android.webkit.WebChromeClient
-import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import androidx.compose.foundation.background
@@ -45,6 +43,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.tv.material3.Text
+import com.fpa.dangjiandaping.ui.login.LocalBigScreenDeviceLoginResult
 
 private const val SCALE_WIDE_PAGE_SCRIPT =
     "(function(){" +
@@ -72,6 +71,7 @@ internal fun WebViewDialog(
 ) {
     val closeFocusRequester = remember { FocusRequester() }
     val webViewHolder = remember { arrayOfNulls<WebView>(1) }
+    val loginResultJson = LocalBigScreenDeviceLoginResult.current.toH5LoginResultJson()
     val requestedTitle = title?.trim()?.takeIf(String::isNotEmpty)
     var pageTitle by remember(url, requestedTitle) {
         mutableStateOf(requestedTitle ?: "网页详情")
@@ -132,12 +132,12 @@ internal fun WebViewDialog(
                         .fillMaxWidth()
                         .weight(1f)
                         .clip(RoundedCornerShape(8.dp))
-                        .background(HelpDialogWarmWhite)
-                        .border(1.dp, HelpDialogGoldBorder, RoundedCornerShape(8.dp)),
+                    .background(HelpDialogWarmWhite)
+                    .border(1.dp, HelpDialogGoldBorder, RoundedCornerShape(8.dp)),
                     factory = { context ->
                         val scrollStepPx =
                             (72 * context.resources.displayMetrics.density).toInt()
-                        object : WebView(context) {
+                        object : CommonWebView(context, url, loginResultJson) {
                             override fun dispatchKeyEvent(event: KeyEvent): Boolean {
                                 if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP) {
                                     if (event.action == KeyEvent.ACTION_DOWN) {
@@ -165,10 +165,6 @@ internal fun WebViewDialog(
                             }
                         }.apply {
                             webViewHolder[0] = this
-                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                                defaultFocusHighlightEnabled = false
-                            }
-
                             layoutParams = ViewGroup.LayoutParams(
                                 ViewGroup.LayoutParams.MATCH_PARENT,
                                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -187,7 +183,9 @@ internal fun WebViewDialog(
                                     super.onPageFinished(view, url)
                                     // Some pages finish laying out shortly after onPageFinished.
                                     view.postDelayed(
-                                        { view.evaluateJavascript(SCALE_WIDE_PAGE_SCRIPT, null) },
+                                        {
+                                            view.evaluateJavascript(SCALE_WIDE_PAGE_SCRIPT, null)
+                                        },
                                         300L,
                                     )
                                 }
@@ -205,30 +203,27 @@ internal fun WebViewDialog(
                                 }
                             }
                             settings.apply {
-                                javaScriptEnabled = true
-                                domStorageEnabled = true
-                                mediaPlaybackRequiresUserGesture = false
-                                mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
-                                cacheMode = WebSettings.LOAD_DEFAULT
-                                userAgentString = MOBILE_BROWSER_USER_AGENT
-                                useWideViewPort = true
                                 loadWithOverviewMode = true
-                                builtInZoomControls = false
                                 displayZoomControls = false
-                                setSupportZoom(true)
                             }
-                            isVerticalScrollBarEnabled = true
-                            isScrollbarFadingEnabled = false
-                            scrollBarStyle = View.SCROLLBARS_INSIDE_OVERLAY
-                            tag = url
+                            addJavascriptInterface(
+                                WebFocusBridge(
+                                    webView = this,
+                                    onGetUserJson = { getUserJson() },
+                                ),
+                                "AndroidFocusBridge",
+                            )
                             loadUrl(url)
                         }
                     },
                     update = { webView ->
-                        if (webView.tag != url) {
+                        val commonWebView = webView as? CommonWebView
+                        if (commonWebView?.requestUrl != url) {
                             pageTitle = requestedTitle ?: "网页详情"
-                            webView.tag = url
+                            commonWebView?.updateRequestUrl(url, loginResultJson)
                             webView.loadUrl(url)
+                        } else {
+                            commonWebView?.updateLoginResult(loginResultJson)
                         }
                     },
                     onRelease = { webView ->
@@ -237,6 +232,7 @@ internal fun WebViewDialog(
                         }
                         webView.stopLoading()
                         webView.loadUrl("about:blank")
+                        webView.removeJavascriptInterface("AndroidFocusBridge")
                         webView.removeAllViews()
                         webView.destroy()
                     },

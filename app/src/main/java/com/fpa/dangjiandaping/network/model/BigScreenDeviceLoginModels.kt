@@ -35,7 +35,8 @@ data class BigScreenDeviceLoginError(
     val message: String? = null,
 )
 
-/** 大屏设备登录成功后，供后续业务接口携带到 Authorization 请求头的会话信息。 */
+/** 大屏设备登录响应的 result，同时供原生接口和 H5 登录回调使用。 */
+@Serializable
 data class BigScreenDeviceSession(
     val accessToken: String,
     val userId: String?,

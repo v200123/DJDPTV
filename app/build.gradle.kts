@@ -17,7 +17,7 @@ android {
         buildConfigField(
             "String",
             "BIG_SCREEN_DEVICE_CODE",
-            "\"deviceCodeNum1\"",
+            "\"Tv-device-ganzi001\"",
         )
         buildConfigField(
             "String",
@@ -85,6 +85,7 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
     implementation("com.squareup.retrofit2:converter-kotlinx-serialization:3.0.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.1")
     debugImplementation("androidx.compose.ui:ui-tooling")

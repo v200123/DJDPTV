@@ -14,7 +14,9 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -31,8 +33,12 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.tv.material3.MaterialTheme
 import com.fpa.dangjiandaping.ui.adapt.ProvideScreenAdaptation
-import com.fpa.dangjiandaping.ui.login.BigScreenDeviceLoginUiState
+import com.fpa.dangjiandaping.ui.login.BigScreenDeviceLoginAction
+import com.fpa.dangjiandaping.ui.login.BigScreenDeviceLoginEffect
+import com.fpa.dangjiandaping.ui.login.BigScreenDeviceLoginState
 import com.fpa.dangjiandaping.ui.login.BigScreenDeviceLoginViewModel
+import com.fpa.dangjiandaping.ui.login.BigScreenDeviceLoginViewModelFactory
+import com.fpa.dangjiandaping.ui.login.LocalBigScreenDeviceLoginResult
 import com.fpa.dangjiandaping.ui.screen.DangJianTvScreen
 import com.shuyu.gsyvideoplayer.player.PlayerFactory
 import kotlinx.coroutines.delay
@@ -41,7 +47,9 @@ import kotlinx.coroutines.launch
 import tv.danmaku.ijk.media.exo2.Exo2PlayerManager
 
 class MainActivity : ComponentActivity() {
-    private val bigScreenDeviceLoginViewModel: BigScreenDeviceLoginViewModel by viewModels()
+    private val bigScreenDeviceLoginViewModel: BigScreenDeviceLoginViewModel by viewModels {
+        BigScreenDeviceLoginViewModelFactory(applicationContext)
+    }
     private var publicHelpRequestTrigger by mutableIntStateOf(0)
     private var specialHelpKeyIndex = 0
     private var lastSpecialHelpKeyTime = 0L
@@ -57,9 +65,13 @@ class MainActivity : ComponentActivity() {
         }
         PlayerFactory.setPlayManager(Exo2PlayerManager::class.java)
         observeDeviceLogin()
+        bigScreenDeviceLoginViewModel.dispatch(BigScreenDeviceLoginAction.Initialize)
         setContent {
             MaterialTheme {
                 ProvideScreenAdaptation {
+                    val loginState by bigScreenDeviceLoginViewModel.state.collectAsState()
+                    val loginResult = (loginState as? BigScreenDeviceLoginState.Authenticated)
+                        ?.session
                     var showSplash by rememberSaveable { mutableStateOf(true) }
 
                     LaunchedEffect(Unit) {
@@ -67,22 +79,24 @@ class MainActivity : ComponentActivity() {
                         showSplash = false
                     }
 
-                    Box(Modifier.fillMaxSize()) {
-                        DangJianTvScreen(
-                            manualHelpTrigger = publicHelpRequestTrigger,
-                        )
-
-                        AnimatedVisibility(
-                            visible = showSplash,
-                            enter = EnterTransition.None,
-                            exit = fadeOut(animationSpec = tween(SPLASH_FADE_MILLIS)),
-                        ) {
-                            Image(
-                                painter = painterResource(R.drawable.startup_splash),
-                                contentDescription = null,
-                                contentScale = ContentScale.FillBounds,
-                                modifier = Modifier.fillMaxSize(),
+                    CompositionLocalProvider(LocalBigScreenDeviceLoginResult provides loginResult) {
+                        Box(Modifier.fillMaxSize()) {
+                            DangJianTvScreen(
+                                manualHelpTrigger = publicHelpRequestTrigger,
                             )
+
+                            AnimatedVisibility(
+                                visible = showSplash,
+                                enter = EnterTransition.None,
+                                exit = fadeOut(animationSpec = tween(SPLASH_FADE_MILLIS)),
+                            ) {
+                                Image(
+                                    painter = painterResource(R.drawable.startup_splash),
+                                    contentDescription = null,
+                                    contentScale = ContentScale.FillBounds,
+                                    modifier = Modifier.fillMaxSize(),
+                                )
+                            }
                         }
                     }
                 }
@@ -135,17 +149,19 @@ class MainActivity : ComponentActivity() {
     private fun observeDeviceLogin() {
         lifecycleScope.launch {
             repeatOnLifecycle(Lifecycle.State.STARTED) {
-                bigScreenDeviceLoginViewModel.uiState.collect { state ->
-                    when (state) {
-                        is BigScreenDeviceLoginUiState.Authenticated -> {
+                bigScreenDeviceLoginViewModel.effects.collect { effect ->
+                    when (effect) {
+                        BigScreenDeviceLoginEffect.LoginSucceeded -> {
                             Log.i(LOG_TAG, "大屏设备登录成功。")
                         }
 
-                        is BigScreenDeviceLoginUiState.Failed -> {
-                            Log.e(LOG_TAG, "大屏设备登录失败：${state.message}")
+                        BigScreenDeviceLoginEffect.SessionRestored -> {
+                            Log.i(LOG_TAG, "已恢复本地大屏设备登录会话。")
                         }
 
-                        BigScreenDeviceLoginUiState.Loading -> Unit
+                        is BigScreenDeviceLoginEffect.LoginFailed -> {
+                            Log.e(LOG_TAG, "大屏设备登录失败：${effect.message}")
+                        }
                     }
                 }
             }
