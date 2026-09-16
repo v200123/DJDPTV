@@ -2,9 +2,11 @@ package com.fpa.dangjiandaping
 
 import android.os.Bundle
 import android.os.SystemClock
+import android.util.Log
 import android.view.KeyEvent
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.viewModels
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.core.tween
@@ -24,14 +26,22 @@ import androidx.compose.ui.res.painterResource
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.repeatOnLifecycle
 import androidx.tv.material3.MaterialTheme
 import com.fpa.dangjiandaping.ui.adapt.ProvideScreenAdaptation
+import com.fpa.dangjiandaping.ui.login.BigScreenDeviceLoginUiState
+import com.fpa.dangjiandaping.ui.login.BigScreenDeviceLoginViewModel
 import com.fpa.dangjiandaping.ui.screen.DangJianTvScreen
 import com.shuyu.gsyvideoplayer.player.PlayerFactory
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.launch
 import tv.danmaku.ijk.media.exo2.Exo2PlayerManager
 
 class MainActivity : ComponentActivity() {
+    private val bigScreenDeviceLoginViewModel: BigScreenDeviceLoginViewModel by viewModels()
     private var publicHelpRequestTrigger by mutableIntStateOf(0)
     private var specialHelpKeyIndex = 0
     private var lastSpecialHelpKeyTime = 0L
@@ -46,6 +56,7 @@ class MainActivity : ComponentActivity() {
             systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
         }
         PlayerFactory.setPlayManager(Exo2PlayerManager::class.java)
+        observeDeviceLogin()
         setContent {
             MaterialTheme {
                 ProvideScreenAdaptation {
@@ -121,7 +132,28 @@ class MainActivity : ComponentActivity() {
         return super.dispatchKeyEvent(event)
     }
 
+    private fun observeDeviceLogin() {
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                bigScreenDeviceLoginViewModel.uiState.collect { state ->
+                    when (state) {
+                        is BigScreenDeviceLoginUiState.Authenticated -> {
+                            Log.i(LOG_TAG, "大屏设备登录成功。")
+                        }
+
+                        is BigScreenDeviceLoginUiState.Failed -> {
+                            Log.e(LOG_TAG, "大屏设备登录失败：${state.message}")
+                        }
+
+                        BigScreenDeviceLoginUiState.Loading -> Unit
+                    }
+                }
+            }
+        }
+    }
+
     private companion object {
+        const val LOG_TAG = "BigScreenLogin"
         const val SPLASH_DURATION_MILLIS = 2_000L
         const val SPLASH_FADE_MILLIS = 350
         const val SPECIAL_HELP_KEY_TIMEOUT_MILLIS = 2_000L

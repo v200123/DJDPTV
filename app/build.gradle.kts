@@ -14,6 +14,22 @@ android {
         targetSdk = 33
         versionCode = 205
         versionName = "2.0.5"
+        buildConfigField(
+            "String",
+            "BIG_SCREEN_DEVICE_CODE",
+            "\"deviceCodeNum1\"",
+        )
+        buildConfigField(
+            "String",
+            "BIG_SCREEN_LOGIN_SECRET",
+            "\"scgbwlxyBigScreen2026\"",
+        )
+        // 本 App 后续业务接口统一使用此地址；安牧开放平台仍使用其独立地址。
+        buildConfigField(
+            "String",
+            "BIG_SCREEN_API_BASE_URL",
+            "\"http://192.168.99.174:7030/\"",
+        )
     }
 
     buildTypes {
@@ -67,6 +83,9 @@ dependencies {
     implementation("io.github.carguo:gsyvideoplayer-compose:13.1.0")
     implementation("io.github.carguo:gsyvideoplayer-exo2:13.1.0")
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
+    implementation("com.squareup.retrofit2:converter-kotlinx-serialization:3.0.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

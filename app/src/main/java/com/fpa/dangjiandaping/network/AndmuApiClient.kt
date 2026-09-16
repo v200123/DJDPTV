@@ -21,7 +21,11 @@ import retrofit2.http.Body
 import retrofit2.http.HeaderMap
 import retrofit2.http.POST
 
-/** 安牧开放平台 Retrofit 客户端：负责 token 缓存、token 请求和设备列表请求。 */
+/**
+ * 安牧开放平台 Retrofit 客户端：负责 token 缓存、token 请求和设备列表请求。
+ *
+ * 安牧接口固定使用 https://open.qly.cmviot.cn/，与本 App 业务接口地址相互独立。
+ */
 object AndmuApiClient {
     /** 优先复用仍在 6 天安全窗口内的本地 token；没有可用缓存时才调用远端接口。 */
     suspend fun getCachedOrRequestApplicationToken(context: Context): AndmuTokenResult {
