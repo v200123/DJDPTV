@@ -72,7 +72,11 @@ import com.fpa.dangjiandaping.ui.web.mockPublicHelpRequests
 import kotlinx.coroutines.delay
 import kotlin.random.Random
 
-private const val HOME_TAB_INDEX = 0
+private val HOME_TAB_INDEX = TV_TABS.indexOfFirst {
+    it.destination is TvTabDestination.NativeHome
+}.also { index ->
+    check(index >= 0) { "Missing native Home tab" }
+}
 private const val MOCK_HELP_MIN_DELAY_MILLIS = 5_000L
 private const val MOCK_HELP_MAX_DELAY_MILLIS = 12_001L
 private const val CLEAR_WEB_DOM_FOCUS_SCRIPT =
@@ -187,6 +191,9 @@ fun DangJianTvScreen(
                 Toast.makeText(context, "无法打开会议应用", Toast.LENGTH_SHORT).show()
             }
     }
+
+    fun isMeetingTab(tabIndex: Int): Boolean =
+        TV_TABS[tabIndex].destination is TvTabDestination.Meeting
 
     fun handleBack() {
         when {
@@ -311,7 +318,11 @@ fun DangJianTvScreen(
                 focusedTab = lastFocusedTab,
                 tabFocusRequesters = tabFocusRequesters,
                 onTabFocused = { tabIndex ->
-                    if (pendingContentFocusRoute != null ||
+                    if (isMeetingTab(tabIndex)) {
+                        // The meeting tab is a launcher, not an in-app route. Keep Home selected
+                        // while allowing the remote focus to rest on this launcher.
+                        lastFocusedTab = tabIndex
+                    } else if (pendingContentFocusRoute != null ||
                         pendingTabFocusIndex != null ||
                         tabIndex == selectedTab
                     ) {
@@ -320,9 +331,14 @@ fun DangJianTvScreen(
                         activateTab(tabIndex, moveFocusToContent = false)
                     }
                 },
-                onTabSelected = { tabIndex -> activateTab(tabIndex, moveFocusToContent = false) },
-                onTabDown = { tabIndex -> activateTab(tabIndex, moveFocusToContent = true) },
-                onMeetingClick = ::launchMeeting,
+                onTabSelected = { tabIndex ->
+                    if (isMeetingTab(tabIndex)) launchMeeting()
+                    else activateTab(tabIndex, moveFocusToContent = false)
+                },
+                onTabDown = { tabIndex ->
+                    if (isMeetingTab(tabIndex)) launchMeeting()
+                    else activateTab(tabIndex, moveFocusToContent = true)
+                },
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(horizontal = MainContentHorizontalPadding)

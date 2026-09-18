@@ -17,6 +17,9 @@ private val peixunban_URL = "${BASE_URL}training-class"
 private val party_URL = "${BASE_URL}party"
 
 internal sealed interface TvTabDestination {
+    /** Launches the installed third-party meeting app without changing the in-app route. */
+    data object Meeting : TvTabDestination
+
     data object NativeHome : TvTabDestination
 
     data object AndmuDevices : TvTabDestination
@@ -42,6 +45,7 @@ internal data class WebRoute(
 ) : TvRoute
 
 internal fun TvTabDestination.toRoute(tabIndex: Int): TvRoute = when (this) {
+    TvTabDestination.Meeting -> error("The meeting tab must launch its external app directly")
     TvTabDestination.NativeHome -> HomeRoute
     TvTabDestination.AndmuDevices -> AndmuDevicesRoute(tabIndex)
     is TvTabDestination.Web -> WebRoute(tabIndex = tabIndex, url = url)
@@ -69,6 +73,7 @@ internal data class TvTabSpec(
 )
 
 internal val TV_TABS = listOf(
+    TvTabSpec("视频会议", 0.90f, TvTabDestination.Meeting),
     TvTabSpec("首页", 0.75f, TvTabDestination.NativeHome),
     TvTabSpec("培训班", 0.80f, TvTabDestination.Web(peixunban_URL)),
     TvTabSpec(
@@ -77,7 +82,7 @@ internal val TV_TABS = listOf(
         TvTabDestination.Web(PARTY_MEMBER_URL),
         recommended = true
     ),
-    TvTabSpec("咔哒时间·康巴党旗红", 1.65f, TvTabDestination.Web(kangba_URL)),
+    TvTabSpec("咔哒时间", 1.65f, TvTabDestination.Web(kangba_URL)),
     TvTabSpec("师资库", 0.80f, TvTabDestination.Web(teacher_URL)),
     TvTabSpec("阵地库", 0.80f, TvTabDestination.Web(NAV_BASE_URL)),
     TvTabSpec("课件库", 0.80f, TvTabDestination.Web(courseware_URL)),
