@@ -7,6 +7,7 @@ import kotlinx.serialization.Serializable
 private val BASE_URL = BuildConfig.BASE_URL
 
 private val HOME_WEB_URL = BASE_URL
+private val PARTY_MEMBER_URL = "${BASE_URL}find-party-member"
 private val kangba_URL = "${BASE_URL}kangba"
 private val teacher_URL = "${BASE_URL}teacher"
 private val NAV_BASE_URL = "${BASE_URL}base"
