@@ -185,7 +185,7 @@ private fun NewsDetailDialogContent(
             modifier = Modifier
                 .fillMaxSize(0.85f)
                 .tvDialogPanel(RoundedCornerShape(12.dp))
-                .padding(horizontal = 30.dp, vertical = 20.dp),
+                .padding(horizontal = 12.dp, vertical = 8.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Row(
@@ -196,8 +196,7 @@ private fun NewsDetailDialogContent(
                 Text(
                     text = news.title,
                     color = Color.White,
-                    fontSize = 27.sp,
-                    lineHeight = 36.sp,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 2,
                     overflow = TextOverflow.Ellipsis,
@@ -215,14 +214,7 @@ private fun NewsDetailDialogContent(
 
             Spacer(modifier = Modifier.height(18.dp))
 
-            if (audioVideos.isEmpty()) {
-                Text(
-                    text = "当前新闻数据未提供音频地址",
-                    color = HelpDialogMutedText,
-                    fontSize = 16.sp,
-                    modifier = Modifier.padding(vertical = 8.dp)
-                )
-            } else {
+            if (audioVideos.isNotEmpty()) {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(28.dp),

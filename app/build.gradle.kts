@@ -24,16 +24,15 @@ android {
             "BIG_SCREEN_LOGIN_SECRET",
             "\"scgbwlxyBigScreen2026\"",
         )
-        // 本 App 后续业务接口统一使用此地址；安牧开放平台仍使用其独立地址。
-        buildConfigField(
-            "String",
-            "BIG_SCREEN_API_BASE_URL",
-            "\"http://192.168.99.174:7030/\"",
-        )
     }
 
     buildTypes {
         debug {
+            buildConfigField(
+                "String",
+                "BIG_SCREEN_API_BASE_URL",
+                "\"http://192.168.99.174:7030/\"",
+            )
             buildConfigField(
                 "String",
                 "BASE_URL",
@@ -43,9 +42,15 @@ android {
         release {
             buildConfigField(
                 "String",
+                "BIG_SCREEN_API_BASE_URL",
+                "\"https://www.scycjy.gov.cn/\"",
+            )
+            buildConfigField(
+                "String",
                 "BASE_URL",
                 "\"https://www.scycjy.gov.cn/ganziTv/#/\""
             )
+            isDebuggable = true
             signingConfig = signingConfigs.getByName("debug")
         }
     }

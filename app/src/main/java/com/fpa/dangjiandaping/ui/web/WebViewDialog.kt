@@ -104,7 +104,7 @@ internal fun WebViewDialog(
                 modifier = Modifier
                     .fillMaxSize(0.8f)
                     .tvDialogPanel(RoundedCornerShape(12.dp))
-                    .padding(horizontal = 24.dp, vertical = 12.dp),
+                    .padding(horizontal = 12.dp, vertical = 12.dp),
             ) {
                 Row(
                     modifier = Modifier
@@ -126,7 +126,7 @@ internal fun WebViewDialog(
                         focusRequester = closeFocusRequester,
                     )
                 }
-                Spacer(Modifier.height(7.dp))
+                Spacer(Modifier.height(8.dp))
                 AndroidView(
                     modifier = Modifier
                         .fillMaxWidth()

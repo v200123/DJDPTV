@@ -204,7 +204,8 @@ fun DangJianTvScreen(
                 tabFocusRequesters[HOME_TAB_INDEX].requestFocus()
             }
 
-            else -> activity?.finish()
+            // 首页已经是根页面，消费返回键，避免销毁承载首页的 MainActivity。
+            else -> Unit
         }
     }
 

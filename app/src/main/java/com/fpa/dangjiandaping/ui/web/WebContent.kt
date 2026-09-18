@@ -186,7 +186,7 @@ internal fun WebContent(
 //        return
 //    }
 
-//    var createWebView by remember { mutableStateOf(false) }
+    //    var createWebView by remember { mutableStateOf(false) }
     var loadingUrl by remember { mutableStateOf<String?>(url) }
     var newsDetail by remember(url) { mutableStateOf<NewsDetail?>(null) }
     var serviceTeam by remember(url) { mutableStateOf<ServiceTeam?>(null) }
@@ -349,7 +349,7 @@ internal fun WebContent(
                                             Log.e(
                                                 FOCUS_LOG_TAG,
                                                 "Unable to parse news detail JSON",
-                                                error
+                                                error,
                                             )
                                         }
                                 },
@@ -547,7 +547,7 @@ internal fun WebContent(
                 onDismiss = {
                     newsDetail = null
                     restoreNewsDetailFocus = true
-                }
+                },
             )
         }
 

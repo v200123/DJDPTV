@@ -73,7 +73,7 @@ internal fun TvDialogCloseButton(
             .onFocusChanged { focused = it.isFocused }
             .clip(CircleShape)
             .background(if (focused) Color(0xFFD52B38) else Color(0xFFB62430))
-            .border(if (focused) 3.dp else 2.dp, HelpDialogGold, CircleShape)
+            .border(if (focused) 3.dp else 1.dp, HelpDialogGold, CircleShape)
             .focusRequester(focusRequester)
             .logFocusTarget("Dialog.Close")
             .focusOnClick(focusRequester)
@@ -86,7 +86,7 @@ internal fun TvDialogCloseButton(
         Text(
             text = "×",
             color = Color.White,
-            fontSize = 12.sp,
+            fontSize = 15.sp,
             fontWeight = FontWeight.Bold,
         )
     }
