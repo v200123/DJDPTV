@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Expose only captured learning photos from the app-private cache directory. -->
+    <cache-path
+        name="learning_snapshots"
+        path="learning_snapshots/" />
+</paths>

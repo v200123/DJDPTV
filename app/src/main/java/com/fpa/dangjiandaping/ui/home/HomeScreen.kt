@@ -89,6 +89,7 @@ import com.shuyu.gsyvideoplayer.video.base.GSYVideoView
 import kotlinx.coroutines.CancellationException
 
 private const val DEFAULT_HOME_VIDEO_URL = "https://vod.scycjy.gov.cn/20260729/eE9NUYRQ/2000kb/hls/index.m3u8"
+private const val REMOTE_EDUCATION_URL = "https://dygbjy.12371.cn/"
 private const val PARTY_PIONEER_MOBILE_URL = "https://12371.people.com.cn/"
 private const val PARTY_MEMBER_LEARNING_URL = "https://www.scycjy.gov.cn/dyxx_mys.html"
 private const val KANGBA_PARTY_FLAG_URL = "https://www.scycjy.gov.cn/scdjw/2026wsdy.html"//专题专栏第三个选择
@@ -252,6 +253,8 @@ internal fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(
+                    start = 18.dp,
+                    end = 18.dp,
                     top = 8.dp,
                     bottom = 10.dp,
                 ),
@@ -260,7 +263,7 @@ internal fun HomeScreen(
             NewsTicker(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(36.dp),
+                    .height(48.dp),
                 firstItemFocusRequester = contentFocusRequester,
                 firstItemDownFocusRequester = videoControlFocusRequester,
                 onOpenUrl = { url -> webViewDialogUrl = url },
@@ -269,7 +272,7 @@ internal fun HomeScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(225.dp),
+                    .height(288.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 HomeVideoPlayer(
@@ -318,9 +321,15 @@ internal fun HomeScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(112.dp),
+                    .height(150.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
+                RemoteEducationCard(
+                    onClick = { webViewDialogUrl = REMOTE_EDUCATION_URL },
+                    modifier = Modifier
+                        .width(92.dp)
+                        .fillMaxHeight(),
+                )
                 TopicPanel(
                     lastTopicFocusRequester = lastTopicFocusRequester,
                     videoControlFocusRequester = videoControlFocusRequester,
@@ -1032,7 +1041,7 @@ private fun PartyWorkPanel(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(28.dp),
+                .height(38.dp),
         ) {
             SectionTitle(R.drawable.ic_home_zugongdongtai)
             PartyWorkMoreButton(
@@ -1370,6 +1379,23 @@ private fun TopicPanel(
 }
 
 @Composable
+private fun RemoteEducationCard(
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    FocusableTile(modifier = modifier, onClick = onClick) {
+        Image(
+            painter = painterResource(R.drawable.ic_home_remote_education),
+            contentDescription = "全国党员干部现代远程教育",
+            contentScale = ContentScale.FillBounds,
+            modifier = Modifier
+                .fillMaxSize()
+                .clip(RoundedCornerShape(16.dp)),
+        )
+    }
+}
+
+@Composable
 private fun FeatureCard(
     modifier: Modifier,
     @DrawableRes image: Int,
@@ -1379,7 +1405,7 @@ private fun FeatureCard(
         Image(
             painter = painterResource(image),
             contentScale = ContentScale.FillBounds,
-            modifier = Modifier.height(65.dp).fillMaxWidth(),
+            modifier = Modifier.fillMaxSize(),
             contentDescription = null,
         )
     }
@@ -1465,7 +1491,7 @@ private fun HomePanel(
 private fun SectionTitle(@DrawableRes image: Int) {
     Image(painterResource(image), contentDescription = ""
         , contentScale = ContentScale.FillBounds
-        , modifier = Modifier.width(299.dp).height(28.dp))
+        , modifier = Modifier.width(400.dp).height(38.dp))
 }
 
 @Composable

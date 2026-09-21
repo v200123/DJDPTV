@@ -47,6 +47,8 @@ internal open class CommonWebView(
             mediaPlaybackRequiresUserGesture = false
             mixedContentMode = WebSettings.MIXED_CONTENT_ALWAYS_ALLOW
             cacheMode = WebSettings.LOAD_DEFAULT
+            // Learning snapshots are exposed only through this app's narrow FileProvider path.
+            allowContentAccess = true
             userAgentString = MOBILE_BROWSER_USER_AGENT
             useWideViewPort = true
             builtInZoomControls = false

@@ -27,7 +27,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
@@ -100,7 +99,9 @@ fun DangJianTvScreen(
         is WebRoute -> currentRoute.tabIndex
     }
 
-    var lastFocusedTab by rememberSaveable { mutableStateOf(HOME_TAB_INDEX) }
+    // Do not restore a previously focused launcher tab after a cold start.
+    // The app must always enter with Home selected and focused.
+    var lastFocusedTab by remember { mutableStateOf(HOME_TAB_INDEX) }
     var headerHasFocus by remember { mutableStateOf(false) }
     var webView by remember { mutableStateOf<WebView?>(null) }
     var readyWebView by remember { mutableStateOf<WebView?>(null) }
@@ -181,6 +182,13 @@ fun DangJianTvScreen(
     }
 
     fun launchMeeting() {
+        // “视频会议” is an external launcher. Restore the in-app tab state before
+        // leaving so returning from the other app lands on the focused Home tab.
+        lastFocusedTab = HOME_TAB_INDEX
+        pendingContentFocusRoute = null
+        pendingTabFocusIndex = HOME_TAB_INDEX
+        tabFocusRequesters[HOME_TAB_INDEX].requestFocus(FocusDirection.Up)
+
         val meetingIntent = context.packageManager.getLaunchIntentForPackage(MEETING_PACKAGE_NAME)
         if (meetingIntent == null) {
             Toast.makeText(context, "未安装会议应用", Toast.LENGTH_SHORT).show()
@@ -220,7 +228,11 @@ fun DangJianTvScreen(
 
     LaunchedEffect(isInPreview) {
         if (!isInPreview) {
-            tabFocusRequesters[lastFocusedTab].requestFocus()
+            // Focus restoration can otherwise choose the first header item before the row is
+            // attached. Wait for the initial frame, then make Home the deterministic entry tab.
+            withFrameNanos { }
+            lastFocusedTab = HOME_TAB_INDEX
+            tabFocusRequesters[HOME_TAB_INDEX].requestFocus(FocusDirection.Up)
         }
     }
 

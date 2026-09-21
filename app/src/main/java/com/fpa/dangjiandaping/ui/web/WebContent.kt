@@ -11,6 +11,8 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
@@ -30,6 +32,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color as ComposeColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -38,6 +41,7 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import com.fpa.dangjiandaping.data.learning.LearningSnapshotRepository
 import com.fpa.dangjiandaping.ui.login.LocalBigScreenDeviceLoginResult
 
 private const val FOCUS_LOG_TAG = "FocusTrace"
@@ -77,6 +81,9 @@ internal class WebFocusBridge(
     private val onShowServiceTeam: (String) -> Unit = {},
     private val onShowPublicHelpRequest: (String) -> Unit = {},
     private val onPlayVideo: (String, String) -> Unit = { _, _ -> },
+    private val onPlayLearningVideo: (String, String, String) -> Unit = { _, _, _ -> },
+    private val onGetLastLearningVideoResultJson: () -> String? = { null },
+    private val onGetLearningSnapshotsJson: (String) -> String = { "[]" },
     private val onShowWebViewUrl: (String, String?) -> Unit = { _, _ -> },
 ) {
     @JavascriptInterface
@@ -150,6 +157,31 @@ internal class WebFocusBridge(
         }
     }
 
+    /**
+     * Opens the native learning-video player. It records actual playback time and, while
+     * playing, takes a camera snapshot every ten seconds. H5 can pull the final summary with
+     * [getLastLearningVideoResultJson] after the player has closed.
+     */
+    @JavascriptInterface
+    fun playLearningVideo(videoUrl: String?, title: String?, classId: String?) {
+        Log.d(WEB_LOG_TAG, "H5 called playLearningVideo: $videoUrl, classId=$classId")
+        webView.post {
+            onPlayLearningVideo(
+                videoUrl?.trim().orEmpty(),
+                title?.trim().orEmpty(),
+                classId?.trim().orEmpty(),
+            )
+        }
+    }
+
+    @JavascriptInterface
+    fun getLastLearningVideoResultJson(): String? = onGetLastLearningVideoResultJson()
+
+    /** Returns the locally stored camera-photo metadata for a class, newest first. */
+    @JavascriptInterface
+    fun getLearningSnapshotsJson(classId: String?): String =
+        onGetLearningSnapshotsJson(classId?.trim().orEmpty())
+
     @JavascriptInterface
     fun showWebViewUrl(url: String) {
         showWebViewUrl(url, null)
@@ -178,6 +210,7 @@ internal fun WebContent(
     modifier: Modifier = Modifier
 ) {
     val loginResultJson = LocalBigScreenDeviceLoginResult.current.toH5LoginResultJson()
+    val appContext = LocalContext.current.applicationContext
 //    if (LocalInspectionMode.current) {
 //        WebContentPlaceholder(
 //            message = "网页内容预览区",
@@ -196,6 +229,15 @@ internal fun WebContent(
     var restoreWebViewDialogFocus by remember(url) { mutableStateOf(false) }
     var restoreVideoFocus by remember(url) { mutableStateOf(false) }
     var videoActivityPausedHost by remember(url) { mutableStateOf(false) }
+    var lastLearningVideoResultJson by remember(url) { mutableStateOf<String?>(null) }
+    val learningVideoLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        lastLearningVideoResultJson = LearningVideoActivity.readStudyResultJson(result.data)
+    }
+    val learningSnapshotRepository = remember(appContext) {
+        LearningSnapshotRepository.get(appContext)
+    }
     val webViewHolder = remember { arrayOfNulls<WebView>(1) }
     val lifecycleOwner = LocalLifecycleOwner.current
     var appInForeground by remember(lifecycleOwner) {
@@ -383,6 +425,29 @@ internal fun WebContent(
                                             )
                                         )
                                     }
+                                },
+                                onPlayLearningVideo = { requestedUrl, title, classId ->
+                                    if (requestedUrl.isNotEmpty()) {
+                                        restoreVideoFocus = true
+                                        videoActivityPausedHost = false
+                                        learningVideoLauncher.launch(
+                                            LearningVideoActivity.newIntent(
+                                                context = context,
+                                                videoUrl = requestedUrl,
+                                                videoTitle = title,
+                                                classId = classId,
+                                            ),
+                                        )
+                                    }
+                                },
+                                onGetLastLearningVideoResultJson = {
+                                    lastLearningVideoResultJson
+                                },
+                                onGetLearningSnapshotsJson = { classId ->
+                                    val snapshotsJsonForClass =
+                                        learningSnapshotRepository.snapshotsJsonForClass(classId)
+                                    Log.d("database", "snapshotsJsonForClass: ${snapshotsJsonForClass}")
+                                    snapshotsJsonForClass
                                 },
                                 onShowWebViewUrl = { requestedUrl, requestedTitle ->
                                     if (requestedUrl.isNotEmpty()) {

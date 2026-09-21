@@ -179,12 +179,13 @@ class FullscreenVideoActivity : ComponentActivity() {
 }
 
 @Composable
-private fun FullscreenVideoPlayer(
+internal fun FullscreenVideoPlayer(
     videoUrl: String,
     videoTitle: String,
     startPositionMs: Long,
     autoPlay: Boolean,
     onExit: (positionMs: Long, shouldResume: Boolean) -> Unit,
+    onPlaybackStateChanged: (Boolean) -> Unit = {},
 ) {
     val controller = rememberGSYPlayerController(
         url = videoUrl,
@@ -199,6 +200,10 @@ private fun FullscreenVideoPlayer(
     val exitFocusRequester = remember { FocusRequester() }
     var exiting by remember { mutableStateOf(false) }
     var resumeAfterLifecyclePause by remember(controller) { mutableStateOf(autoPlay) }
+
+    LaunchedEffect(snapshot.isPlaying) {
+        onPlaybackStateChanged(snapshot.isPlaying)
+    }
 
     val exitPlayer = {
         if (!exiting) {
