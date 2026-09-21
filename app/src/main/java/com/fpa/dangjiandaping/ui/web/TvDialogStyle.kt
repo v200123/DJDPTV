@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Brush
@@ -57,6 +58,7 @@ internal fun TvDialogCloseButton(
     onClick: () -> Unit,
     focusRequester: FocusRequester,
     modifier: Modifier = Modifier,
+    downFocusRequester: FocusRequester? = null,
 ) {
     var focused by remember { mutableStateOf(false) }
     val scale by animateFloatAsState(
@@ -75,6 +77,9 @@ internal fun TvDialogCloseButton(
             .background(if (focused) Color(0xFFD52B38) else Color(0xFFB62430))
             .border(if (focused) 3.dp else 1.dp, HelpDialogGold, CircleShape)
             .focusRequester(focusRequester)
+            .focusProperties {
+                downFocusRequester?.let { down = it }
+            }
             .logFocusTarget("Dialog.Close")
             .focusOnClick(focusRequester)
             .clickable(role = Role.Button) {

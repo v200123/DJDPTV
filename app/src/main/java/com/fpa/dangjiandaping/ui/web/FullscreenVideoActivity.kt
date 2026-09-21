@@ -186,6 +186,11 @@ internal fun FullscreenVideoPlayer(
     autoPlay: Boolean,
     onExit: (positionMs: Long, shouldResume: Boolean) -> Unit,
     onPlaybackStateChanged: (Boolean) -> Unit = {},
+    modifier: Modifier = Modifier,
+    showTopBar: Boolean = true,
+    isFullscreen: Boolean = true,
+    onFullscreenToggle: (() -> Unit)? = null,
+    onBackRequest: (() -> Unit)? = null,
 ) {
     val controller = rememberGSYPlayerController(
         url = videoUrl,
@@ -198,6 +203,7 @@ internal fun FullscreenVideoPlayer(
     val playFocusRequester = remember { FocusRequester() }
     val seekFocusRequester = remember { FocusRequester() }
     val exitFocusRequester = remember { FocusRequester() }
+    val fullscreenFocusRequester = remember { FocusRequester() }
     var exiting by remember { mutableStateOf(false) }
     var resumeAfterLifecyclePause by remember(controller) { mutableStateOf(autoPlay) }
 
@@ -269,10 +275,10 @@ internal fun FullscreenVideoPlayer(
         playFocusRequester.requestFocus()
     }
 
-    BackHandler(onBack = exitPlayer)
+    BackHandler { onBackRequest?.invoke() ?: exitPlayer() }
 
     Box(
-        modifier = Modifier
+        modifier = modifier
             .fillMaxSize()
             .background(Color.Black),
     ) {
@@ -281,34 +287,36 @@ internal fun FullscreenVideoPlayer(
             modifier = Modifier.fillMaxSize(),
         )
 
-        Row(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .fillMaxWidth()
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color(0xD9000000), Color.Transparent),
-                    ),
+        if (showTopBar) {
+            Row(
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .fillMaxWidth()
+                    .background(
+                        Brush.verticalGradient(
+                            listOf(Color(0xD9000000), Color.Transparent),
+                        ),
+                    )
+                    .padding(start = 32.dp, top = 20.dp, end = 24.dp, bottom = 36.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(
+                    text = videoTitle.ifBlank { "视频播放" },
+                    color = Color.White,
+                    fontSize = 24.sp,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f),
                 )
-                .padding(start = 32.dp, top = 20.dp, end = 24.dp, bottom = 36.dp),
-            verticalAlignment = Alignment.CenterVertically,
-        ) {
-            Text(
-                text = videoTitle.ifBlank { "视频播放" },
-                color = Color.White,
-                fontSize = 24.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            Spacer(Modifier.width(24.dp))
-            PlayerControlButton(
-                text = "退出",
-                focusRequester = exitFocusRequester,
-                downFocusRequester = playFocusRequester,
-                onClick = exitPlayer,
-            )
+                Spacer(Modifier.width(24.dp))
+                PlayerControlButton(
+                    text = "退出",
+                    focusRequester = exitFocusRequester,
+                    downFocusRequester = playFocusRequester,
+                    onClick = exitPlayer,
+                )
+            }
         }
 
         if (snapshot.state == GSYPlayState.Preparing) {
@@ -337,7 +345,7 @@ internal fun FullscreenVideoPlayer(
                 text = if (snapshot.isPlaying) "暂停" else "播放",
                 focusRequester = playFocusRequester,
                 rightFocusRequester = seekFocusRequester,
-                upFocusRequester = exitFocusRequester,
+                upFocusRequester = exitFocusRequester.takeIf { showTopBar },
                 onClick = controller::togglePlayPause,
             )
             TvSeekBar(
@@ -346,7 +354,10 @@ internal fun FullscreenVideoPlayer(
                 bufferPercent = snapshot.bufferPercent,
                 focusRequester = seekFocusRequester,
                 leftFocusRequester = playFocusRequester,
-                upFocusRequester = exitFocusRequester,
+                rightFocusRequester = fullscreenFocusRequester.takeIf {
+                    onFullscreenToggle != null
+                },
+                upFocusRequester = exitFocusRequester.takeIf { showTopBar },
                 onSeekTo = controller::seekTo,
                 modifier = Modifier.weight(1f),
             )
@@ -356,6 +367,15 @@ internal fun FullscreenVideoPlayer(
                 color = Color.White,
                 fontSize = 15.sp,
             )
+            if (onFullscreenToggle != null) {
+                PlayerControlButton(
+                    text = if (isFullscreen) "退出全屏" else "全屏",
+                    focusRequester = fullscreenFocusRequester,
+                    leftFocusRequester = seekFocusRequester,
+                    upFocusRequester = exitFocusRequester.takeIf { showTopBar },
+                    onClick = onFullscreenToggle,
+                )
+            }
         }
     }
 }
@@ -366,6 +386,7 @@ private fun PlayerControlButton(
     focusRequester: FocusRequester,
     onClick: () -> Unit,
     rightFocusRequester: FocusRequester? = null,
+    leftFocusRequester: FocusRequester? = null,
     downFocusRequester: FocusRequester? = null,
     upFocusRequester: FocusRequester? = null,
 ) {
@@ -379,6 +400,7 @@ private fun PlayerControlButton(
             .focusOnClick(focusRequester)
             .focusProperties {
                 rightFocusRequester?.let { right = it }
+                leftFocusRequester?.let { left = it }
                 downFocusRequester?.let { down = it }
                 upFocusRequester?.let { up = it }
             }
@@ -436,7 +458,8 @@ private fun TvSeekBar(
     bufferPercent: Int,
     focusRequester: FocusRequester,
     leftFocusRequester: FocusRequester,
-    upFocusRequester: FocusRequester,
+    rightFocusRequester: FocusRequester? = null,
+    upFocusRequester: FocusRequester? = null,
     onSeekTo: (Long) -> Unit,
     modifier: Modifier = Modifier,
 ) {
@@ -452,7 +475,8 @@ private fun TvSeekBar(
             .focusOnClick(focusRequester)
             .focusProperties {
                 left = leftFocusRequester
-                up = upFocusRequester
+                rightFocusRequester?.let { right = it }
+                upFocusRequester?.let { up = it }
             }
             .onFocusChanged { focused = it.isFocused }
             .onPreviewKeyEvent { event ->

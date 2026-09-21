@@ -44,7 +44,10 @@ import androidx.webkit.WebViewAssetLoader
 import androidx.webkit.WebViewClientCompat
 import com.fpa.dangjiandaping.data.learning.LEARNING_SNAPSHOT_CACHE_DIRECTORY
 import com.fpa.dangjiandaping.data.learning.LEARNING_SNAPSHOT_WEB_PATH
+import com.fpa.dangjiandaping.data.learning.LearningSnapshotEntity
 import com.fpa.dangjiandaping.data.learning.LearningSnapshotRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import com.fpa.dangjiandaping.ui.login.LocalBigScreenDeviceLoginResult
 import java.io.File
@@ -86,9 +89,21 @@ internal class WebFocusBridge(
     private val onShowServiceTeam: (String) -> Unit = {},
     private val onShowPublicHelpRequest: (String) -> Unit = {},
     private val onPlayVideo: (String, String) -> Unit = { _, _ -> },
-    private val onPlayLearningVideo: (String, String, String, String) -> Unit = { _, _, _, _ -> },
+    private val onPlayLearningVideo: (
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+    ) -> Unit = { _, _, _, _, _, _, _, _, _ -> },
     private val onGetLastLearningVideoResultJson: () -> String? = { null },
     private val onGetLearningSnapshotsJson: (String) -> String = { "[]" },
+    private val onGetLearningCoursesJson: (String) -> String = { "[]" },
+    private val onShowCourseImages: (String) -> Unit = {},
     private val onShowWebViewUrl: (String, String?) -> Unit = { _, _ -> },
 ) {
     @JavascriptInterface
@@ -191,12 +206,27 @@ internal class WebFocusBridge(
         val classId = request.optString("classId").trim()
             .ifEmpty { request.optString("resourceClassId").trim() }
         val resourceId = request.optString("id").trim()
+        val speaker = request.optString("speaker").trim()
+        val startTime = request.optString("startTime").trim()
+        val endTime = request.optString("endTime").trim()
+        val resourceType = "course"
+        val resourceTypeName = "课程"
         Log.d(
             WEB_LOG_TAG,
             "H5 called playLearningVideo: $videoUrl, classId=$classId, resourceId=$resourceId",
         )
         webView.post {
-            onPlayLearningVideo(videoUrl, title, classId, resourceId)
+            onPlayLearningVideo(
+                videoUrl,
+                title,
+                classId,
+                resourceId,
+                resourceType,
+                resourceTypeName,
+                speaker,
+                startTime,
+                endTime,
+            )
         }
     }
 
@@ -207,6 +237,37 @@ internal class WebFocusBridge(
     @JavascriptInterface
     fun getLearningSnapshotsJson(classId: String?): String =
         onGetLearningSnapshotsJson(classId?.trim().orEmpty())
+
+    /** Returns locally collected course summaries for a training class. */
+    @JavascriptInterface
+    fun getLearningCoursesJson(classId: String?): String =
+        onGetLearningCoursesJson(classId?.trim().orEmpty())
+
+    /** Opens the native learning-evidence dialog for one course resource. */
+    @JavascriptInterface
+    fun showCourseImages(id: String?) {
+        val resourceId = id?.trim().orEmpty()
+        Log.e(
+            WEB_LOG_TAG,
+            "H5 showCourseImages 入参：rawId=[$id], " +
+                "resourceId=[$resourceId], length=${resourceId.length}",
+        )
+        if (
+            resourceId.isEmpty() ||
+            resourceId.equals("undefined", ignoreCase = true) ||
+            resourceId.equals("null", ignoreCase = true)
+        ) {
+            Log.e(WEB_LOG_TAG, "H5 showCourseImages 收到非法课程 ID，已取消查询")
+            return
+        }
+        Log.d(WEB_LOG_TAG, "H5 called showCourseImages: resourceId=$resourceId")
+        webView.post {
+            webView.evaluateJavascript(CAPTURE_WEB_FOCUS_SCRIPT) {
+                webView.clearFocus()
+                onShowCourseImages(resourceId)
+            }
+        }
+    }
 
     @JavascriptInterface
     fun showWebViewUrl(url: String) {
@@ -249,9 +310,14 @@ internal fun WebContent(
     var loadingUrl by remember { mutableStateOf<String?>(url) }
     var newsDetail by remember(url) { mutableStateOf<NewsDetail?>(null) }
     var serviceTeam by remember(url) { mutableStateOf<ServiceTeam?>(null) }
+    var courseImagesResourceId by remember(url) { mutableStateOf<String?>(null) }
+    var courseImagesSnapshots by remember(url) {
+        mutableStateOf<List<LearningSnapshotEntity>?>(null)
+    }
     var webViewDialogRequest by remember(url) { mutableStateOf<WebViewDialogRequest?>(null) }
     var restoreNewsDetailFocus by remember(url) { mutableStateOf(false) }
     var restoreServiceTeamFocus by remember(url) { mutableStateOf(false) }
+    var restoreCourseImagesFocus by remember(url) { mutableStateOf(false) }
     var restoreWebViewDialogFocus by remember(url) { mutableStateOf(false) }
     var restoreVideoFocus by remember(url) { mutableStateOf(false) }
     var videoActivityPausedHost by remember(url) { mutableStateOf(false) }
@@ -263,6 +329,14 @@ internal fun WebContent(
     }
     val learningSnapshotRepository = remember(appContext) {
         LearningSnapshotRepository.get(appContext)
+    }
+
+    LaunchedEffect(courseImagesResourceId) {
+        val resourceId = courseImagesResourceId ?: return@LaunchedEffect
+        courseImagesSnapshots = null
+        courseImagesSnapshots = withContext(Dispatchers.IO) {
+            learningSnapshotRepository.snapshotsForResource(resourceId)
+        }
     }
     val webViewHolder = remember { arrayOfNulls<WebView>(1) }
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -310,6 +384,21 @@ internal fun WebContent(
                 }
             }
             restoreServiceTeamFocus = false
+        }
+    }
+
+    LaunchedEffect(courseImagesResourceId, restoreCourseImagesFocus) {
+        if (courseImagesResourceId == null && restoreCourseImagesFocus) {
+            withFrameNanos { }
+            webViewHolder[0]?.let { webView ->
+                webView.isFocusable = true
+                webView.isFocusableInTouchMode = true
+                webView.requestFocus()
+                webView.evaluateJavascript(RESTORE_WEB_FOCUS_SCRIPT) { restored ->
+                    Log.d(FOCUS_LOG_TAG, "Course images dialog focus restored=$restored")
+                }
+            }
+            restoreCourseImagesFocus = false
         }
     }
 
@@ -465,7 +554,17 @@ internal fun WebContent(
                                         )
                                     }
                                 },
-                                onPlayLearningVideo = { requestedUrl, title, classId, resourceId ->
+                                onPlayLearningVideo = {
+                                        requestedUrl,
+                                        title,
+                                        classId,
+                                        resourceId,
+                                        resourceType,
+                                        resourceTypeName,
+                                        speaker,
+                                        startTime,
+                                        endTime,
+                                    ->
                                     if (requestedUrl.isNotEmpty()) {
                                         restoreVideoFocus = true
                                         videoActivityPausedHost = false
@@ -476,6 +575,11 @@ internal fun WebContent(
                                                 videoTitle = title,
                                                 classId = classId,
                                                 resourceId = resourceId,
+                                                resourceType = resourceType,
+                                                resourceTypeName = resourceTypeName,
+                                                speaker = speaker,
+                                                startTime = startTime,
+                                                endTime = endTime,
                                             ),
                                         )
                                     }
@@ -488,6 +592,12 @@ internal fun WebContent(
                                         learningSnapshotRepository.snapshotsJsonForClass(classId)
                                     Log.d("database", "snapshotsJsonForClass: ${snapshotsJsonForClass}")
                                     snapshotsJsonForClass
+                                },
+                                onGetLearningCoursesJson = { classId ->
+                                    learningSnapshotRepository.learningCoursesJsonForClass(classId)
+                                },
+                                onShowCourseImages = { resourceId ->
+                                    courseImagesResourceId = resourceId
                                 },
                                 onShowWebViewUrl = { requestedUrl, requestedTitle ->
                                     if (requestedUrl.isNotEmpty()) {
@@ -678,6 +788,18 @@ internal fun WebContent(
                 onDismiss = {
                     serviceTeam = null
                     restoreServiceTeamFocus = true
+                },
+            )
+        }
+
+        courseImagesResourceId?.let { resourceId ->
+            CourseImagesDialog(
+                resourceId = resourceId,
+                snapshots = courseImagesSnapshots,
+                onDismiss = {
+                    courseImagesResourceId = null
+                    courseImagesSnapshots = null
+                    restoreCourseImagesFocus = true
                 },
             )
         }
