@@ -253,8 +253,6 @@ internal fun HomeScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(
-                    start = 18.dp,
-                    end = 18.dp,
                     top = 8.dp,
                     bottom = 10.dp,
                 ),
@@ -263,7 +261,7 @@ internal fun HomeScreen(
             NewsTicker(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(48.dp),
+                    .height(36.dp),
                 firstItemFocusRequester = contentFocusRequester,
                 firstItemDownFocusRequester = videoControlFocusRequester,
                 onOpenUrl = { url -> webViewDialogUrl = url },
@@ -272,7 +270,7 @@ internal fun HomeScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(288.dp),
+                    .height(225.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 HomeVideoPlayer(
@@ -321,7 +319,7 @@ internal fun HomeScreen(
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(150.dp),
+                    .height(112.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 RemoteEducationCard(
@@ -1041,7 +1039,7 @@ private fun PartyWorkPanel(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(38.dp),
+                .height(28.dp),
         ) {
             SectionTitle(R.drawable.ic_home_zugongdongtai)
             PartyWorkMoreButton(
@@ -1405,7 +1403,7 @@ private fun FeatureCard(
         Image(
             painter = painterResource(image),
             contentScale = ContentScale.FillBounds,
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier.height(65.dp).fillMaxWidth(),
             contentDescription = null,
         )
     }
@@ -1491,7 +1489,7 @@ private fun HomePanel(
 private fun SectionTitle(@DrawableRes image: Int) {
     Image(painterResource(image), contentDescription = ""
         , contentScale = ContentScale.FillBounds
-        , modifier = Modifier.width(400.dp).height(38.dp))
+        , modifier = Modifier.width(299.dp).height(28.dp))
 }
 
 @Composable

@@ -1,6 +1,7 @@
 package com.fpa.dangjiandaping.data.learning
 
 import android.content.Context
+import android.net.Uri
 import android.util.Log
 import androidx.room.ColumnInfo
 import androidx.room.Dao
@@ -15,7 +16,6 @@ import androidx.room.Room
 import androidx.room.RoomDatabase
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
-import androidx.core.content.FileProvider
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -97,13 +97,7 @@ class LearningSnapshotRepository private constructor(context: Context) {
                         .forEach { snapshot ->
                             val photoFile = File(snapshot.imagePath)
                             if (!photoFile.isFile) return@forEach
-                            val imageUri = runCatching {
-                                FileProvider.getUriForFile(
-                                    appContext,
-                                    "${appContext.packageName}$FILE_PROVIDER_AUTHORITY_SUFFIX",
-                                    photoFile,
-                                )
-                            }.getOrNull() ?: return@forEach
+                            val imageUri = photoFile.toLearningSnapshotWebUrl() ?: return@forEach
                             put(
                                 JSONObject()
                                     .put("id", snapshot.id)
@@ -115,14 +109,27 @@ class LearningSnapshotRepository private constructor(context: Context) {
                 }.toString()
             }
         }.getOrElse {
-            Log.d("database", "snapshotsJsonForClass: 失败了")
+            Log.e("database", "snapshotsJsonForClass failed", it)
             "[]" }
+
+    private fun File.toLearningSnapshotWebUrl(): String? {
+        val root = File(appContext.cacheDir, LEARNING_SNAPSHOT_CACHE_DIRECTORY).canonicalFile
+        val photo = canonicalFile
+        val rootPrefix = root.path + File.separator
+        if (!photo.path.startsWith(rootPrefix)) return null
+        val relativeSegments = photo.relativeTo(root).invariantSeparatorsPath.split('/')
+        return Uri.Builder()
+            .scheme("https")
+            .authority(LEARNING_SNAPSHOT_WEB_HOST)
+            .appendPath(LEARNING_SNAPSHOT_WEB_ROUTE)
+            .apply { relativeSegments.forEach { appendPath(it) } }
+            .build()
+            .toString()
+    }
 
     companion object {
         private const val DATABASE_NAME = "learning_snapshot.db"
         private const val UNKNOWN_CLASS_ID = "unknown"
-        private const val FILE_PROVIDER_AUTHORITY_SUFFIX = ".learning-snapshot-files"
-
         private val MIGRATION_1_2 = object : Migration(1, 2) {
             override fun migrate(database: SupportSQLiteDatabase) {
                 database.execSQL(
@@ -160,3 +167,8 @@ class LearningSnapshotRepository private constructor(context: Context) {
             }
     }
 }
+
+internal const val LEARNING_SNAPSHOT_CACHE_DIRECTORY = "learning_snapshots"
+internal const val LEARNING_SNAPSHOT_WEB_HOST = "appassets.androidplatform.net"
+internal const val LEARNING_SNAPSHOT_WEB_ROUTE = "learning-snapshots"
+internal const val LEARNING_SNAPSHOT_WEB_PATH = "/$LEARNING_SNAPSHOT_WEB_ROUTE/"

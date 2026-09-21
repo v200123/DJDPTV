@@ -10,7 +10,6 @@ import android.view.ViewGroup
 import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -41,8 +40,14 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import androidx.webkit.WebViewAssetLoader
+import androidx.webkit.WebViewClientCompat
+import com.fpa.dangjiandaping.data.learning.LEARNING_SNAPSHOT_CACHE_DIRECTORY
+import com.fpa.dangjiandaping.data.learning.LEARNING_SNAPSHOT_WEB_PATH
 import com.fpa.dangjiandaping.data.learning.LearningSnapshotRepository
+import org.json.JSONObject
 import com.fpa.dangjiandaping.ui.login.LocalBigScreenDeviceLoginResult
+import java.io.File
 
 private const val FOCUS_LOG_TAG = "FocusTrace"
 private const val WEB_LOG_TAG = "WebContent"
@@ -81,7 +86,7 @@ internal class WebFocusBridge(
     private val onShowServiceTeam: (String) -> Unit = {},
     private val onShowPublicHelpRequest: (String) -> Unit = {},
     private val onPlayVideo: (String, String) -> Unit = { _, _ -> },
-    private val onPlayLearningVideo: (String, String, String) -> Unit = { _, _, _ -> },
+    private val onPlayLearningVideo: (String, String, String, String) -> Unit = { _, _, _, _ -> },
     private val onGetLastLearningVideoResultJson: () -> String? = { null },
     private val onGetLearningSnapshotsJson: (String) -> String = { "[]" },
     private val onShowWebViewUrl: (String, String?) -> Unit = { _, _ -> },
@@ -163,14 +168,35 @@ internal class WebFocusBridge(
      * [getLastLearningVideoResultJson] after the player has closed.
      */
     @JavascriptInterface
-    fun playLearningVideo(videoUrl: String?, title: String?, classId: String?) {
-        Log.d(WEB_LOG_TAG, "H5 called playLearningVideo: $videoUrl, classId=$classId")
+    fun playLearningVideo(requestJson: String?) {
+        Log.e(WEB_LOG_TAG, "request: $requestJson")
+
+        val request = runCatching {
+            JSONObject(requestJson?.trim().orEmpty()) }
+            .getOrElse { error ->
+                Log.e(WEB_LOG_TAG, "Invalid playLearningVideo request: $requestJson", error)
+                return
+            }
+        val videoUrl = request.optString("ppVideoM3u8Url").trim()
+            .ifEmpty {
+                request.optJSONArray("ppVideoM3u8Urls")
+                    ?.optJSONObject(0)
+                    ?.optString("url")
+                    ?.trim()
+                    .orEmpty()
+            }
+            .ifEmpty { request.optString("videoUrl").trim() }
+        val title = request.optString("name").trim()
+            .ifEmpty { request.optString("title").trim() }
+        val classId = request.optString("classId").trim()
+            .ifEmpty { request.optString("resourceClassId").trim() }
+        val resourceId = request.optString("id").trim()
+        Log.d(
+            WEB_LOG_TAG,
+            "H5 called playLearningVideo: $videoUrl, classId=$classId, resourceId=$resourceId",
+        )
         webView.post {
-            onPlayLearningVideo(
-                videoUrl?.trim().orEmpty(),
-                title?.trim().orEmpty(),
-                classId?.trim().orEmpty(),
-            )
+            onPlayLearningVideo(videoUrl, title, classId, resourceId)
         }
     }
 
@@ -348,6 +374,19 @@ internal fun WebContent(
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { context ->
+                    val learningSnapshotDirectory = File(
+                        context.cacheDir,
+                        LEARNING_SNAPSHOT_CACHE_DIRECTORY,
+                    ).apply { mkdirs() }
+                    val learningSnapshotAssetLoader = WebViewAssetLoader.Builder()
+                        .addPathHandler(
+                            LEARNING_SNAPSHOT_WEB_PATH,
+                            WebViewAssetLoader.InternalStoragePathHandler(
+                                context,
+                                learningSnapshotDirectory,
+                            ),
+                        )
+                        .build()
 //                    if (BuildConfig.DEBUG) {
 //                        WebView.setWebContentsDebuggingEnabled(true)
 //                        Log.i(WEB_LOG_TAG, "WebView remote debugging enabled")
@@ -426,7 +465,7 @@ internal fun WebContent(
                                         )
                                     }
                                 },
-                                onPlayLearningVideo = { requestedUrl, title, classId ->
+                                onPlayLearningVideo = { requestedUrl, title, classId, resourceId ->
                                     if (requestedUrl.isNotEmpty()) {
                                         restoreVideoFocus = true
                                         videoActivityPausedHost = false
@@ -436,6 +475,7 @@ internal fun WebContent(
                                                 videoUrl = requestedUrl,
                                                 videoTitle = title,
                                                 classId = classId,
+                                                resourceId = resourceId,
                                             ),
                                         )
                                     }
@@ -492,7 +532,23 @@ internal fun WebContent(
                                 }
                             }
                         }
-                        webViewClient = object : WebViewClient() {
+                        webViewClient = object : WebViewClientCompat() {
+                            override fun shouldInterceptRequest(
+                                view: WebView,
+                                request: android.webkit.WebResourceRequest,
+                            ): android.webkit.WebResourceResponse? =
+                                learningSnapshotAssetLoader.shouldInterceptRequest(request.url)
+                                    ?: super.shouldInterceptRequest(view, request)
+
+                            @Suppress("DEPRECATION")
+                            override fun shouldInterceptRequest(
+                                view: WebView,
+                                url: String,
+                            ): android.webkit.WebResourceResponse? =
+                                learningSnapshotAssetLoader.shouldInterceptRequest(
+                                    android.net.Uri.parse(url),
+                                ) ?: super.shouldInterceptRequest(view, url)
+
                             override fun onPageStarted(
                                 view: WebView,
                                 url: String?,
@@ -504,7 +560,7 @@ internal fun WebContent(
                                 onPageReadyChanged(view, false)
                             }
 
-                            override fun onPageCommitVisible(view: WebView, url: String?) {
+                            override fun onPageCommitVisible(view: WebView, url: String) {
                                 super.onPageCommitVisible(view, url)
                                 Log.i(WEB_LOG_TAG, "onPageCommitVisible: $url")
                                 loadingUrl = null

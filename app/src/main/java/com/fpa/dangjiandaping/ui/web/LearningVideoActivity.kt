@@ -24,6 +24,7 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.LifecycleOwner
 import androidx.tv.material3.MaterialTheme
 import com.fpa.dangjiandaping.BuildConfig
+import com.fpa.dangjiandaping.data.learning.LEARNING_SNAPSHOT_CACHE_DIRECTORY
 import com.fpa.dangjiandaping.data.learning.LearningSnapshotRepository
 import com.shuyu.gsyvideoplayer.player.PlayerFactory
 import org.json.JSONObject
@@ -59,6 +60,7 @@ class LearningVideoActivity : ComponentActivity() {
         val videoUrl = intent.getStringExtra(EXTRA_VIDEO_URL).orEmpty()
         val videoTitle = intent.getStringExtra(EXTRA_VIDEO_TITLE).orEmpty()
         val classId = intent.getStringExtra(EXTRA_CLASS_ID).orEmpty()
+        val resourceId = intent.getStringExtra(EXTRA_RESOURCE_ID).orEmpty()
         if (videoUrl.isBlank()) {
             finish()
             return
@@ -69,7 +71,10 @@ class LearningVideoActivity : ComponentActivity() {
         PlayerFactory.setPlayManager(Exo2PlayerManager::class.java)
         snapshotCamera = LearningSnapshotCamera(this, this)
         snapshotRepository = LearningSnapshotRepository.get(this)
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
+        if (!packageManager.hasSystemFeature(PackageManager.FEATURE_CAMERA_ANY)) {
+            cameraStatus = CAMERA_STATUS_UNAVAILABLE
+            showDebugCameraToast("未检测到可用摄像头")
+        } else if (ContextCompat.checkSelfPermission(this, Manifest.permission.CAMERA) ==
             PackageManager.PERMISSION_GRANTED
         ) {
             startSnapshotCamera()
@@ -105,7 +110,7 @@ class LearningVideoActivity : ComponentActivity() {
                             onError = { cameraStatus = CAMERA_STATUS_CAPTURE_FAILED },
                         )
                     },
-                    onExit = { _, _ -> finishWithStudyResult(classId) },
+                    onExit = { _, _ -> finishWithStudyResult(classId, resourceId) },
                 )
             }
         }
@@ -120,13 +125,25 @@ class LearningVideoActivity : ComponentActivity() {
         cameraStatus = CAMERA_STATUS_STARTING
         snapshotCamera.start(
             onReady = { cameraStatus = CAMERA_STATUS_ENABLED },
-            onError = { cameraStatus = CAMERA_STATUS_UNAVAILABLE },
+            onError = { noCameraAvailable ->
+                cameraStatus = CAMERA_STATUS_UNAVAILABLE
+                if (noCameraAvailable) {
+                    showDebugCameraToast("未检测到可用摄像头")
+                }
+            },
         )
     }
 
-    private fun finishWithStudyResult(classId: String) {
+    private fun showDebugCameraToast(message: String) {
+        if (BuildConfig.DEBUG) {
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private fun finishWithStudyResult(classId: String, resourceId: String) {
         val result = JSONObject()
             .put("classId", classId)
+            .put("id", resourceId)
             .put("playedDurationMs", studyTracker.stop())
             .put("captureCount", studyTracker.captureCount)
             .put("cameraStatus", cameraStatus)
@@ -139,6 +156,7 @@ class LearningVideoActivity : ComponentActivity() {
         private const val EXTRA_VIDEO_URL = "learning_video_url"
         private const val EXTRA_VIDEO_TITLE = "learning_video_title"
         private const val EXTRA_CLASS_ID = "learning_video_class_id"
+        private const val EXTRA_RESOURCE_ID = "learning_video_resource_id"
         private const val EXTRA_STUDY_RESULT_JSON = "learning_video_study_result_json"
 
         private const val CAMERA_STATUS_PENDING_PERMISSION = "pending_permission"
@@ -153,11 +171,13 @@ class LearningVideoActivity : ComponentActivity() {
             videoUrl: String,
             videoTitle: String,
             classId: String,
+            resourceId: String,
         ): Intent =
             Intent(context, LearningVideoActivity::class.java)
                 .putExtra(EXTRA_VIDEO_URL, videoUrl)
                 .putExtra(EXTRA_VIDEO_TITLE, videoTitle)
                 .putExtra(EXTRA_CLASS_ID, classId)
+                .putExtra(EXTRA_RESOURCE_ID, resourceId)
 
         internal fun readStudyResultJson(intent: Intent?): String? =
             intent?.getStringExtra(EXTRA_STUDY_RESULT_JSON)
@@ -238,34 +258,28 @@ private class LearningSnapshotCamera(
     private var imageCapture: ImageCapture? = null
     private var captureInFlight = false
 
-    fun start(onReady: () -> Unit, onError: () -> Unit) {
+    fun start(onReady: () -> Unit, onError: (noCameraAvailable: Boolean) -> Unit) {
         val providerFuture = ProcessCameraProvider.getInstance(context)
         providerFuture.addListener(
             {
                 runCatching {
                     val provider = providerFuture.get()
+                    val firstCameraInfo = provider.availableCameraInfos.firstOrNull()
+                        ?: throw NoAvailableCameraException()
+                    val cameraSelector = CameraSelector.Builder()
+                        .addCameraFilter { cameraInfos ->
+                            cameraInfos.filter { it == firstCameraInfo }
+                        }
+                        .build()
                     val capture = ImageCapture.Builder()
                         .setCaptureMode(ImageCapture.CAPTURE_MODE_MINIMIZE_LATENCY)
                         .build()
                     provider.unbindAll()
-                    runCatching {
-                        provider.bindToLifecycle(
-                            lifecycleOwner,
-                            CameraSelector.DEFAULT_FRONT_CAMERA,
-                            capture,
-                        )
-                    }.getOrElse {
-                        provider.unbindAll()
-                        provider.bindToLifecycle(
-                            lifecycleOwner,
-                            CameraSelector.DEFAULT_BACK_CAMERA,
-                            capture,
-                        )
-                    }
+                    provider.bindToLifecycle(lifecycleOwner, cameraSelector, capture)
                     cameraProvider = provider
                     imageCapture = capture
                 }.onSuccess { onReady() }
-                    .onFailure { onError() }
+                    .onFailure { onError(it is NoAvailableCameraException) }
             },
             mainExecutor,
         )
@@ -282,7 +296,10 @@ private class LearningSnapshotCamera(
         val safeLearningId = classId.replace(Regex("[^A-Za-z0-9._-]"), "_")
             .take(80)
             .ifBlank { "anonymous" }
-        val directory = File(context.cacheDir, "learning_snapshots/$safeLearningId")
+        val directory = File(
+            context.cacheDir,
+            "$LEARNING_SNAPSHOT_CACHE_DIRECTORY/$safeLearningId",
+        )
         if (!directory.exists() && !directory.mkdirs()) {
             captureInFlight = false
             return onError()
@@ -311,4 +328,6 @@ private class LearningSnapshotCamera(
         cameraProvider = null
     }
 }
+private class NoAvailableCameraException : IllegalStateException()
+
 private const val SNAPSHOT_INTERVAL_MILLIS = 10_000L
