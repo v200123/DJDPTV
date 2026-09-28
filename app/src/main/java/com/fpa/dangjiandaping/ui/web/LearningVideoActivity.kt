@@ -106,9 +106,6 @@ class LearningVideoActivity : ComponentActivity() {
         val resourceId = intent.getStringExtra(EXTRA_RESOURCE_ID).orEmpty()
         val resourceType = intent.getStringExtra(EXTRA_RESOURCE_TYPE).orEmpty()
         val resourceTypeName = intent.getStringExtra(EXTRA_RESOURCE_TYPE_NAME).orEmpty()
-        val speaker = intent.getStringExtra(EXTRA_SPEAKER).orEmpty()
-        val startTime = intent.getStringExtra(EXTRA_START_TIME).orEmpty()
-        val endTime = intent.getStringExtra(EXTRA_END_TIME).orEmpty()
         if (videoUrl.isBlank()) {
             finish()
             return
@@ -143,9 +140,6 @@ class LearningVideoActivity : ComponentActivity() {
                 LearningVideoPlayer(
                     videoUrl = videoUrl,
                     videoTitle = videoTitle,
-                    speaker = speaker,
-                    startTime = startTime,
-                    endTime = endTime,
                     cameraReady = cameraStatus == CAMERA_STATUS_ENABLED,
                     cameraStatusText = cameraStatus.toDisplayText(),
                     captureCount = capturedSnapshotCount,
@@ -362,9 +356,6 @@ class LearningVideoActivity : ComponentActivity() {
 private fun LearningVideoPlayer(
     videoUrl: String,
     videoTitle: String,
-    speaker: String,
-    startTime: String,
-    endTime: String,
     cameraReady: Boolean,
     cameraStatusText: String,
     captureCount: Int,
@@ -452,11 +443,6 @@ private fun LearningVideoPlayer(
             ) {
                 LearningVideoHeader(
                     title = videoTitle.ifBlank { "学习视频" },
-                    subtitle = buildCourseInfoText(
-                        speaker = speaker,
-                        startTime = startTime,
-                        endTime = endTime,
-                    ),
                     onBack = exitPlayer,
                 )
             }
@@ -491,7 +477,6 @@ private fun LearningVideoPlayer(
 @Composable
 private fun LearningVideoHeader(
     title: String,
-    subtitle: String,
     onBack: () -> Unit,
 ) {
     Row(
@@ -502,38 +487,15 @@ private fun LearningVideoHeader(
     ) {
         LearningBackButton(onClick = onBack)
         Spacer(Modifier.width(16.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = title,
-                color = PARTY_HEADER_TITLE,
-                fontSize = 25.sp,
-                fontWeight = FontWeight.Bold,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-            Spacer(Modifier.height(3.dp))
-            Text(
-                text = subtitle,
-                color = PARTY_HEADER_SUBTITLE,
-                fontSize = 14.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis,
-            )
-        }
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(18.dp))
-                .background(PARTY_RED_SOFT)
-                .border(1.dp, PARTY_GOLD.copy(alpha = 0.65f), RoundedCornerShape(18.dp))
-                .padding(horizontal = 18.dp, vertical = 8.dp),
-        ) {
-            Text(
-                text = "学习进行中",
-                color = PARTY_RED,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-            )
-        }
+        Text(
+            text = title,
+            modifier = Modifier.weight(1f),
+            color = PARTY_HEADER_TITLE,
+            fontSize = 25.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+        )
     }
 }
 
@@ -613,7 +575,7 @@ private fun LearningCaptureNotice(
             Text(
                 text = when {
                     !cameraReady -> statusText
-                    playing -> "系统每 10 秒自动抓拍，请保持正常学习状态"
+                    playing -> "请注意，10秒后将进行抓拍"
                     else -> "继续播放后重新计时，满 10 秒后自动抓拍"
                 },
                 color = if (cameraReady && playing) PARTY_TEXT_MUTED else PARTY_RED,
@@ -665,7 +627,7 @@ private fun LearningStatusPanel(
         Spacer(Modifier.width(15.dp))
         Column(modifier = Modifier.width(245.dp)) {
             Text(
-                text = "本次学习时长",
+                text = "累计学习时长",
                 color = PARTY_TEXT_MUTED,
                 fontSize = 17.sp,
                 fontWeight = FontWeight.Medium,
@@ -824,28 +786,6 @@ private fun formatStudyDuration(valueMillis: Long): String {
     return "%02d:%02d:%02d".format(hours, minutes, seconds)
 }
 
-private fun buildCourseInfoText(
-    speaker: String,
-    startTime: String,
-    endTime: String,
-): String {
-    val courseInfo = mutableListOf<String>()
-    val speakerText = speaker.trim().takeUnless {
-        it.isBlank() || it.equals("null", ignoreCase = true)
-    } ?: "暂无"
-    courseInfo += "主讲人：$speakerText"
-    val timeText = when {
-        startTime.isNotBlank() && endTime.isNotBlank() -> "$startTime - $endTime"
-        startTime.isNotBlank() -> startTime
-        endTime.isNotBlank() -> endTime
-        else -> ""
-    }
-    if (timeText.isNotBlank()) {
-        courseInfo += timeText
-    }
-    return courseInfo.joinToString("  ·  ").ifBlank { "党员教育 · 在线学习" }
-}
-
 private class StudyDurationTracker {
     private var playbackStartedAtMs: Long? = null
     private var accumulatedPlaybackMs: Long = 0L
@@ -979,6 +919,5 @@ private val PARTY_RED_BACKGROUND_DARK = Color(0xFF5F050C)
 private val PARTY_GOLD = Color(0xFFE8B94D)
 private val PARTY_GOLD_LIGHT = Color(0xFFFFE5A0)
 private val PARTY_HEADER_TITLE = Color(0xFFFFF3D0)
-private val PARTY_HEADER_SUBTITLE = Color(0xFFFFE1DB)
 private val PARTY_TEXT_DARK = Color(0xFF3A1518)
 private val PARTY_TEXT_MUTED = Color(0xFF7B5A5D)

@@ -88,7 +88,7 @@ import com.shuyu.gsyvideoplayer.compose.native_.rememberGSYPlayerController
 import com.shuyu.gsyvideoplayer.video.base.GSYVideoView
 import kotlinx.coroutines.CancellationException
 
-private const val DEFAULT_HOME_VIDEO_URL = "https://vod.scycjy.gov.cn/20260729/eE9NUYRQ/2000kb/hls/index.m3u8"
+private const val DEFAULT_HOME_VIDEO_URL = "https://12371wbndtxy.liveplay.myqcloud.com/12371wbnd/dangyuanwang_2/index.m3u8"
 private const val PARTY_PIONEER_MOBILE_URL = "https://12371.people.com.cn/"
 private const val PARTY_MEMBER_LEARNING_URL = "https://www.scycjy.gov.cn/dyxx_mys.html"
 private const val KANGBA_PARTY_FLAG_URL = "https://www.scycjy.gov.cn/ganziTv/#/zhuanti/wsdy"//专题专栏第三个选择
