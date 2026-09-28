@@ -2,7 +2,6 @@ package com.fpa.dangjiandaping.ui.web
 
 import android.annotation.SuppressLint
 import android.graphics.Color
-import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -25,11 +24,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -77,7 +74,6 @@ internal fun WebViewDialog(
     var pageTitle by remember(url, requestedTitle) {
         mutableStateOf(requestedTitle ?: "网页详情")
     }
-    var closeFocusRequestTrigger by remember { mutableIntStateOf(0) }
 
     Dialog(
         onDismissRequest = onDismiss,
@@ -135,35 +131,7 @@ internal fun WebViewDialog(
                     .background(HelpDialogWarmWhite)
                     .border(1.dp, HelpDialogGoldBorder, RoundedCornerShape(8.dp)),
                     factory = { context ->
-                        val scrollStepPx =
-                            (72 * context.resources.displayMetrics.density).toInt()
-                        object : CommonWebView(context, url, loginResultJson) {
-                            override fun dispatchKeyEvent(event: KeyEvent): Boolean {
-                                if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP) {
-                                    if (event.action == KeyEvent.ACTION_DOWN) {
-                                        if (canScrollVertically(-1)) {
-                                            scrollBy(0, -scrollStepPx)
-                                        } else if (event.repeatCount == 0) {
-                                            isFocusable = false
-                                            isFocusableInTouchMode = false
-                                            clearFocus()
-                                            closeFocusRequestTrigger++
-                                        }
-                                    }
-                                    // Consume DOWN and UP before WebView/HTML handles them.
-                                    return true
-                                }
-                                if (event.keyCode == KeyEvent.KEYCODE_DPAD_DOWN) {
-                                    if (event.action == KeyEvent.ACTION_DOWN &&
-                                        canScrollVertically(1)
-                                    ) {
-                                        scrollBy(0, scrollStepPx)
-                                    }
-                                    return true
-                                }
-                                return super.dispatchKeyEvent(event)
-                            }
-                        }.apply {
+                        CommonWebView(context, url, loginResultJson).apply {
                             webViewHolder[0] = this
                             layoutParams = ViewGroup.LayoutParams(
                                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -246,16 +214,4 @@ internal fun WebViewDialog(
         closeFocusRequester.requestFocus()
     }
 
-    LaunchedEffect(closeFocusRequestTrigger) {
-        if (closeFocusRequestTrigger > 0) {
-            // Let AndroidView finish dispatching DPAD_UP before Compose takes focus back.
-            withFrameNanos { }
-            closeFocusRequester.requestFocus()
-            withFrameNanos { }
-            webViewHolder[0]?.let { webView ->
-                webView.isFocusable = true
-                webView.isFocusableInTouchMode = true
-            }
-        }
-    }
 }

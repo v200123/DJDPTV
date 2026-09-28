@@ -89,10 +89,9 @@ import com.shuyu.gsyvideoplayer.video.base.GSYVideoView
 import kotlinx.coroutines.CancellationException
 
 private const val DEFAULT_HOME_VIDEO_URL = "https://vod.scycjy.gov.cn/20260729/eE9NUYRQ/2000kb/hls/index.m3u8"
-private const val REMOTE_EDUCATION_URL = "https://dygbjy.12371.cn/"
 private const val PARTY_PIONEER_MOBILE_URL = "https://12371.people.com.cn/"
 private const val PARTY_MEMBER_LEARNING_URL = "https://www.scycjy.gov.cn/dyxx_mys.html"
-private const val KANGBA_PARTY_FLAG_URL = "https://www.scycjy.gov.cn/scdjw/2026wsdy.html"//专题专栏第三个选择
+private const val KANGBA_PARTY_FLAG_URL = "https://www.scycjy.gov.cn/ganziTv/#/zhuanti/wsdy"//专题专栏第三个选择
 private const val WORK_DYNAMICS_DETAIL_URL_PREFIX = "https://www.xyxf.gov.cn/#/index/details?id="
 private const val WORK_DYNAMICS_DETAIL_URL_SUFFIX = "&details=true&name=%E7%BB%84%E5%B7%A5%E5%8A%A8%E6%80%81"
 private const val PIONEER_COMMENTARY_DETAIL_URL = "https://www.xyxf.gov.cn/#/index/details?id=2097918339568496642&name=%E9%9B%AA%E5%9F%9F%E5%85%88%E9%94%8B%E6%97%B6%E8%AF%84"
@@ -153,6 +152,7 @@ internal fun HomeScreen(
     onRequestTabFocus: () -> Unit = {},
     onCoursewareClick: (Int) -> Unit = {},
     onPartyBuildingTabClick: () -> Unit = {},
+    onMeetingClick: () -> Unit = {},
 ) {
     val context = LocalContext.current
     val lastTopicFocusRequester = remember { FocusRequester() }
@@ -322,8 +322,8 @@ internal fun HomeScreen(
                     .height(112.dp),
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
-                RemoteEducationCard(
-                    onClick = { webViewDialogUrl = REMOTE_EDUCATION_URL },
+                MeetingLauncherCard(
+                    onClick = onMeetingClick,
                     modifier = Modifier
                         .width(92.dp)
                         .fillMaxHeight(),
@@ -433,10 +433,10 @@ private fun NewsTicker(
             SpeakerIcon(Modifier.size(24.dp))
             Spacer(Modifier.width(12.dp))
             TickerItem(
-                text = "关于组织开展2024年度党员教育培训工作",
+                text = "甘孜县：深耕“三篇文章” 激活人才动能",
                 onClick = {
                     onOpenUrl(
-                        "https://www.xyxf.gov.cn/#/index/details?id=2080461005451776002&name=%E5%B7%A5%E4%BD%9C%E5%8A%A8%E6%80%81",
+                        "https://www.xyxf.gov.cn/#/index/details?id=2101838698290106370&details=true&name=%E4%BA%BA%E6%89%8D%E5%B7%A5%E4%BD%9C",
                     )
                 },
                 modifier = Modifier.weight(1f),
@@ -445,21 +445,21 @@ private fun NewsTicker(
             )
             TickerDivider()
             TickerItem(
-                text = "雅江县：“三维赋能”让党员教育在高原落地生根",
+                text = "丹巴县：“三措并举”激活乡村振兴人才引擎",
                 modifier = Modifier.weight(1.2f),
                 onClick = {
                     onOpenUrl(
-                        "https://www.xyxf.gov.cn/#/index/details?id=2080460616023232513&name=%E5%B7%A5%E4%BD%9C%E5%8A%A8%E6%80%81",
+                        "https://www.xyxf.gov.cn/#/index/details?id=2086986621214801922&details=true&name=%E4%BA%BA%E6%89%8D%E5%B7%A5%E4%BD%9C",
                     )
                 },
             )
             TickerDivider()
             TickerItem(
-                text = "康定市：建强农业实用人才队伍……",
+                text = "康定市：“陪跑计划”建强农村电商主播人才队伍",
                 modifier = Modifier.weight(0.82f),
                 onClick = {
                     onOpenUrl(
-                        "https://www.xyxf.gov.cn/#/index/details?id=2080459428695461890&name=%E5%B7%A5%E4%BD%9C%E5%8A%A8%E6%80%81",
+                        "https://www.xyxf.gov.cn/#/index/details?id=2084076371872665601&details=true&name=%E4%BA%BA%E6%89%8D%E5%B7%A5%E4%BD%9C",
                     )
                 },
             )
@@ -1377,19 +1377,32 @@ private fun TopicPanel(
 }
 
 @Composable
-private fun RemoteEducationCard(
+private fun MeetingLauncherCard(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     FocusableTile(modifier = modifier, onClick = onClick) {
-        Image(
-            painter = painterResource(R.drawable.ic_home_remote_education),
-            contentDescription = "全国党员干部现代远程教育",
-            contentScale = ContentScale.FillBounds,
-            modifier = Modifier
-                .fillMaxSize()
-                .clip(RoundedCornerShape(16.dp)),
-        )
+        Box(contentAlignment = Alignment.BottomCenter) {
+            Image(
+                painter = painterResource(R.drawable.ic_home_video_meeting),
+                contentDescription = null,
+                contentScale = ContentScale.FillBounds,
+                modifier = Modifier
+                    .fillMaxSize()
+                    .clip(RoundedCornerShape(8.dp)),
+            )
+            Text(
+                text = "视频会议",
+                color = Color.White,
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 4.dp, vertical = 5.dp),
+            )
+        }
     }
 }
 
@@ -1529,8 +1542,7 @@ private fun FocusableTile(
         modifier = modifier
             .fillMaxHeight()
             .zIndex(if (focused) 1f else 0f)
-            .graphicsLayer { scaleX = scale; scaleY = scale }
-            .clip(RoundedCornerShape(8.dp))
+            .graphicsLayer { scaleX = scale; scaleY = scale; clip = false }
             .then(if (focused) Modifier.border(3.dp, BrightGold, RoundedCornerShape(8.dp)) else Modifier)
             .onFocusChanged { focused = it.isFocused }
             .focusRequester(clickFocusRequester)

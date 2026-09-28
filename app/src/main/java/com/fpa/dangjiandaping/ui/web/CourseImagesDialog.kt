@@ -123,9 +123,7 @@ internal fun CourseImagesDialog(
                         .fillMaxWidth(0.86f)
                         .fillMaxHeight(0.84f)
                         .shadow(18.dp, RoundedCornerShape(18.dp))
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(COURSE_EVIDENCE_BACKGROUND)
-                        .border(1.dp, COURSE_EVIDENCE_BORDER, RoundedCornerShape(18.dp))
+                        .tvDialogPanel(RoundedCornerShape(18.dp))
                         .padding(horizontal = 24.dp, vertical = 20.dp),
                 ) {
                     Row(
@@ -137,12 +135,12 @@ internal fun CourseImagesDialog(
                                 .width(6.dp)
                                 .height(32.dp)
                                 .clip(RoundedCornerShape(4.dp))
-                                .background(COURSE_EVIDENCE_RED),
+                                .background(COURSE_EVIDENCE_GOLD),
                         )
                         Spacer(Modifier.width(12.dp))
                         Text(
                             text = "学习凭证",
-                            color = COURSE_EVIDENCE_TEXT,
+                            color = HelpDialogWarmWhite,
                             fontSize = 18.sp,
                             fontWeight = FontWeight.Bold,
                             modifier = Modifier.weight(1f),
@@ -156,7 +154,7 @@ internal fun CourseImagesDialog(
                     Spacer(Modifier.height(12.dp))
                     Text(
                         text = courseName.ifBlank { "课程学习记录" },
-                        color = COURSE_EVIDENCE_TEXT,
+                        color = HelpDialogWarmWhite,
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
@@ -169,7 +167,7 @@ internal fun CourseImagesDialog(
                             snapshots.isEmpty() -> "该课程暂未采集学习凭证"
                             else -> "共抓拍 ${snapshots.size} 次"
                         },
-                        color = COURSE_EVIDENCE_MUTED,
+                        color = HelpDialogMutedText,
                         fontSize = 14.sp,
                     )
                     Spacer(Modifier.height(14.dp))
@@ -228,13 +226,13 @@ private fun CourseEvidenceEmptyState(message: String) {
             .fillMaxWidth()
             .height(190.dp)
             .clip(RoundedCornerShape(14.dp))
-            .background(COURSE_EVIDENCE_SOFT_RED)
-            .border(1.dp, COURSE_EVIDENCE_BORDER, RoundedCornerShape(14.dp)),
+            .background(HelpDialogCardRed)
+            .border(1.dp, HelpDialogGoldBorder, RoundedCornerShape(14.dp)),
         contentAlignment = Alignment.Center,
     ) {
         Text(
             text = message,
-            color = COURSE_EVIDENCE_MUTED,
+            color = HelpDialogMutedText,
             fontSize = 17.sp,
             lineHeight = 26.sp,
         )
@@ -254,7 +252,7 @@ private fun LearningEvidencePhotoCard(
         modifier = Modifier
             .fillMaxWidth()
             .clip(shape)
-            .background(Color.White)
+            .background(COURSE_EVIDENCE_CARD_BACKGROUND)
             .border(
                 width = if (focused) 4.dp else 1.dp,
                 color = if (focused) COURSE_EVIDENCE_GOLD else COURSE_EVIDENCE_BORDER,
@@ -295,9 +293,7 @@ private fun LearningEvidenceImagePreview(
             .fillMaxWidth(0.9f)
             .fillMaxHeight(0.9f)
             .shadow(18.dp, shape)
-            .clip(shape)
-            .background(COURSE_EVIDENCE_BACKGROUND)
-            .border(1.dp, COURSE_EVIDENCE_BORDER, shape)
+            .tvDialogPanel(shape)
             .padding(18.dp),
     ) {
         Row(
@@ -306,7 +302,7 @@ private fun LearningEvidenceImagePreview(
         ) {
             Text(
                 text = snapshot.resourceName.ifBlank { "学习凭证大图" },
-                color = COURSE_EVIDENCE_TEXT,
+                color = HelpDialogWarmWhite,
                 fontSize = 18.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
@@ -334,6 +330,7 @@ private fun LearningEvidenceImagePreview(
         EvidenceTimestamp(
             timestampMillis = snapshot.capturedAtMillis,
             enlarged = true,
+            onDarkBackground = true,
         )
     }
 }
@@ -342,6 +339,7 @@ private fun LearningEvidenceImagePreview(
 private fun EvidenceTimestamp(
     timestampMillis: Long,
     enlarged: Boolean = false,
+    onDarkBackground: Boolean = false,
 ) {
     Column(
         modifier = Modifier.fillMaxWidth(),
@@ -349,7 +347,7 @@ private fun EvidenceTimestamp(
     ) {
         Text(
             text = formatEvidenceDate(timestampMillis),
-            color = COURSE_EVIDENCE_TEXT,
+            color = if (onDarkBackground) HelpDialogWarmWhite else COURSE_EVIDENCE_TEXT,
             fontSize = if (enlarged) 16.sp else 13.sp,
             lineHeight = if (enlarged) 19.sp else 16.sp,
             fontWeight = FontWeight.Bold,
@@ -358,7 +356,7 @@ private fun EvidenceTimestamp(
         )
         Text(
             text = formatEvidenceClockTime(timestampMillis),
-            color = COURSE_EVIDENCE_MUTED,
+            color = if (onDarkBackground) HelpDialogMutedText else COURSE_EVIDENCE_MUTED,
             fontSize = if (enlarged) 13.sp else 11.sp,
             lineHeight = if (enlarged) 16.sp else 14.sp,
             textAlign = TextAlign.Center,
@@ -420,12 +418,11 @@ private fun formatEvidenceDate(timestampMillis: Long): String =
 private fun formatEvidenceClockTime(timestampMillis: Long): String =
     SimpleDateFormat("HH:mm:ss", Locale.getDefault()).format(Date(timestampMillis))
 
-private val COURSE_EVIDENCE_BACKGROUND = Color(0xFFFFFAF6)
-private val COURSE_EVIDENCE_SCRIM = Color(0x33C91522)
+private val COURSE_EVIDENCE_SCRIM = Color(0x66C91522)
 private val COURSE_EVIDENCE_SOFT_RED = Color(0xFFFFECE8)
-private val COURSE_EVIDENCE_RED = Color(0xFFC91522)
 private val COURSE_EVIDENCE_GOLD = Color(0xFFE4B44A)
 private val COURSE_EVIDENCE_BORDER = Color(0xFFE8C9C4)
+private val COURSE_EVIDENCE_CARD_BACKGROUND = Color(0xFFFFF8F4)
 private val COURSE_EVIDENCE_TEXT = Color(0xFF351619)
 private val COURSE_EVIDENCE_MUTED = Color(0xFF775B5E)
 private const val PHOTO_GRID_COLUMN_COUNT = 5

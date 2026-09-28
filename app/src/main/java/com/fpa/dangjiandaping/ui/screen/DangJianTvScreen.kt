@@ -30,7 +30,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -200,8 +199,6 @@ fun DangJianTvScreen(
             }
     }
 
-    fun isMeetingTab(tabIndex: Int): Boolean =
-        TV_TABS[tabIndex].destination is TvTabDestination.Meeting
 
     fun handleBack() {
         when {
@@ -330,11 +327,7 @@ fun DangJianTvScreen(
                 focusedTab = lastFocusedTab,
                 tabFocusRequesters = tabFocusRequesters,
                 onTabFocused = { tabIndex ->
-                    if (isMeetingTab(tabIndex)) {
-                        // The meeting tab is a launcher, not an in-app route. Keep Home selected
-                        // while allowing the remote focus to rest on this launcher.
-                        lastFocusedTab = tabIndex
-                    } else if (pendingContentFocusRoute != null ||
+                    if (pendingContentFocusRoute != null ||
                         pendingTabFocusIndex != null ||
                         tabIndex == selectedTab
                     ) {
@@ -344,12 +337,10 @@ fun DangJianTvScreen(
                     }
                 },
                 onTabSelected = { tabIndex ->
-                    if (isMeetingTab(tabIndex)) launchMeeting()
-                    else activateTab(tabIndex, moveFocusToContent = false)
+                    activateTab(tabIndex, moveFocusToContent = false)
                 },
                 onTabDown = { tabIndex ->
-                    if (isMeetingTab(tabIndex)) launchMeeting()
-                    else activateTab(tabIndex, moveFocusToContent = true)
+                    activateTab(tabIndex, moveFocusToContent = true)
                 },
                 modifier = Modifier
                     .fillMaxWidth()
@@ -362,8 +353,7 @@ fun DangJianTvScreen(
                 modifier = Modifier
                     .fillMaxWidth()
                     .weight(1f)
-                    .padding(horizontal = MainContentHorizontalPadding)
-                    .clipToBounds(),
+                    .padding(horizontal = MainContentHorizontalPadding),
                 onBack = ::handleBack,
                 transitionSpec = { EnterTransition.None togetherWith ExitTransition.None },
                 popTransitionSpec = { EnterTransition.None togetherWith ExitTransition.None },
@@ -381,6 +371,7 @@ fun DangJianTvScreen(
                             onPartyBuildingTabClick = {
                                 activateTab(partyBuildingTabIndex(), moveFocusToContent = false)
                             },
+                            onMeetingClick = ::launchMeeting,
                         )
                     }
                     entry<WebRoute> { route ->

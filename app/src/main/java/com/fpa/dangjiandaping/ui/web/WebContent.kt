@@ -185,7 +185,6 @@ internal class WebFocusBridge(
     @JavascriptInterface
     fun playLearningVideo(requestJson: String?) {
         Log.e(WEB_LOG_TAG, "request: $requestJson")
-
         val request = runCatching {
             JSONObject(requestJson?.trim().orEmpty()) }
             .getOrElse { error ->
@@ -394,9 +393,12 @@ internal fun WebContent(
                 webView.isFocusable = true
                 webView.isFocusableInTouchMode = true
                 webView.requestFocus()
-                webView.evaluateJavascript(RESTORE_WEB_FOCUS_SCRIPT) { restored ->
-                    Log.d(FOCUS_LOG_TAG, "Course images dialog focus restored=$restored")
+                // Keep H5's virtual selection, but do not reactivate its previous DOM control.
+                // Otherwise the next DPAD_CENTER can activate a stale link and navigate/reload.
+                webView.evaluateJavascript(CLEAR_WEB_DOM_FOCUS_SCRIPT) { cleared ->
+                    Log.d(FOCUS_LOG_TAG, "Course images dialog dismissed -> DOM active element cleared=$cleared")
                 }
+                Log.d(FOCUS_LOG_TAG, "Course images dialog dismissed -> native WebView focus restored")
             }
             restoreCourseImagesFocus = false
         }

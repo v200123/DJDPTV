@@ -51,6 +51,8 @@ import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.unit.constrainHeight
+import androidx.compose.ui.unit.constrainWidth
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.fpa.dangjiandaping.R
@@ -138,7 +140,9 @@ private fun HeaderTabRow(
 
     Row(
         modifier = modifier
-            .focusRestorer()
+            // Use the selected tab as the fallback when focus leaves the row temporarily.
+            // Without an explicit fallback, restoration may select a different tab.
+            .focusRestorer(fallback = tabFocusRequesters[selectedTab])
             .onFocusChanged { tabRowHasFocus = it.hasFocus },
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
@@ -211,10 +215,10 @@ private fun TabBrushIndicator(modifier: Modifier = Modifier) {
     Image(
         painter = painterResource(R.drawable.ic_top_tab_ind),
         contentDescription = null,
-        contentScale = ContentScale.None,
+        contentScale = ContentScale.FillBounds,
         modifier = modifier
-            .size(width = 53.dp, height = 9.dp)
-            .offset(y = 8.dp)
+            .width(width = 45.dp)
+            .offset(y = 5.dp)
     )
 }
 
@@ -292,7 +296,7 @@ private fun StableTabLabel(
                 text = text,
                 color = Color.Transparent,
                 fontSize = 22.sp,
-                fontStyle = FontStyle.Italic,
+                fontStyle = FontStyle.Normal,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
             )
@@ -300,7 +304,7 @@ private fun StableTabLabel(
                 text = text,
                 color = if (emphasized) Color.White else Color(0xFFEBCACA),
                 fontSize = 16.sp,
-                fontStyle = if (focused) FontStyle.Italic else FontStyle.Normal,
+                fontStyle = FontStyle.Normal,
                 fontWeight = if (emphasized) FontWeight.Bold else FontWeight.Medium,
                 textAlign = TextAlign.Center,
                 maxLines = 1,
@@ -333,16 +337,25 @@ private fun StableTabLabel(
         val normal = measurables[0].measure(constraints)
         val maximum = measurables[1].measure(constraints)
         val current = measurables[2].measure(constraints)
-        val height = maximum.height
+        // Keep each tab's footprint identical with and without focus. The largest text
+        // sample is 22sp; reserve the scaled focused border/padding around it up front.
+        // graphicsLayer does not change measured size, so this fixed space also prevents
+        // the label from colliding with adjacent tabs when it grows visually.
+        val visualScale = 22f / 16f
+        val horizontalFocusInsets = (12.dp.roundToPx() * visualScale).toInt()
+        val verticalFocusInsets = (8.dp.roundToPx() * visualScale).toInt()
+        val width = constraints.constrainWidth(
+            maxOf(normal.width, maximum.width + horizontalFocusInsets),
+        )
+        val height = constraints.constrainHeight(maximum.height + verticalFocusInsets)
         val currentX = when {
             isFirst -> 0
-            isLast -> normal.width - current.width
-            else -> (normal.width - current.width) / 2
+            isLast -> width - current.width
+            else -> (width - current.width) / 2
         }
-
-        layout(normal.width, height) {
+        layout(width, height) {
             normal.placeRelative(0, (height - normal.height) / 2)
-            maximum.placeRelative(0, 0)
+            maximum.placeRelative((width - maximum.width) / 2, 0)
             current.placeRelative(currentX, (height - current.height) / 2)
         }
     }

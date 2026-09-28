@@ -404,9 +404,12 @@ private fun LearningVideoPlayer(
         modifier = Modifier
             .fillMaxSize()
             .background(
-                Brush.radialGradient(
-                    colors = listOf(PARTY_RED_BACKGROUND_GLOW, PARTY_WARM_BACKGROUND),
-                    radius = 1_500f,
+                Brush.verticalGradient(
+                    colors = listOf(
+                        PARTY_RED_BACKGROUND_DARK,
+                        PARTY_RED_DARK,
+                        PARTY_RED,
+                    ),
                 ),
             ),
     ) {
@@ -502,7 +505,7 @@ private fun LearningVideoHeader(
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = title,
-                color = PARTY_TEXT_DARK,
+                color = PARTY_HEADER_TITLE,
                 fontSize = 25.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
@@ -511,7 +514,7 @@ private fun LearningVideoHeader(
             Spacer(Modifier.height(3.dp))
             Text(
                 text = subtitle,
-                color = PARTY_TEXT_MUTED,
+                color = PARTY_HEADER_SUBTITLE,
                 fontSize = 14.sp,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
@@ -827,9 +830,10 @@ private fun buildCourseInfoText(
     endTime: String,
 ): String {
     val courseInfo = mutableListOf<String>()
-    if (speaker.isNotBlank()) {
-        courseInfo += "主讲人：$speaker"
-    }
+    val speakerText = speaker.trim().takeUnless {
+        it.isBlank() || it.equals("null", ignoreCase = true)
+    } ?: "暂无"
+    courseInfo += "主讲人：$speakerText"
     val timeText = when {
         startTime.isNotBlank() && endTime.isNotBlank() -> "$startTime - $endTime"
         startTime.isNotBlank() -> startTime
@@ -971,9 +975,10 @@ private val PARTY_RED_DARK = Color(0xFF8F0712)
 private val PARTY_RED_LIGHT = Color(0xFFE8463F)
 private val PARTY_RED_SOFT = Color(0xFFFFECE8)
 private val PARTY_RED_BORDER = Color(0xFFF2C9C2)
-private val PARTY_WARM_BACKGROUND = Color(0xFFFFF8F3)
-private val PARTY_RED_BACKGROUND_GLOW = Color(0xFFFFEAE3)
+private val PARTY_RED_BACKGROUND_DARK = Color(0xFF5F050C)
 private val PARTY_GOLD = Color(0xFFE8B94D)
 private val PARTY_GOLD_LIGHT = Color(0xFFFFE5A0)
+private val PARTY_HEADER_TITLE = Color(0xFFFFF3D0)
+private val PARTY_HEADER_SUBTITLE = Color(0xFFFFE1DB)
 private val PARTY_TEXT_DARK = Color(0xFF3A1518)
 private val PARTY_TEXT_MUTED = Color(0xFF7B5A5D)
