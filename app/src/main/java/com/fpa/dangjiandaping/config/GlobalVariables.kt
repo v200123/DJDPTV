@@ -9,13 +9,13 @@ object GlobalVariables {
     const val ANDMU_TOKEN_URL = "https://open.qly.cmviot.cn/v3/open/api/token"
 
     /** 在安牧开发者控制台获取的 appid。 */
-    var andmuAppId: String = "bdea95dff98b47978907f8c9c3a8a169"
+    var andmuAppId: String = "cf2972d3795c4358bf0144faadb3115b"
 
     /** 在安牧开发者控制台获取的 secret。 */
-    var andmuSecret: String = "b1soe8NOdTCIiTdP"
+    var andmuSecret: String = "fJ0Wz96JkQiN4syH"
 
     /** 控制台分配的 PKCS#8 RSA 私钥 Base64 内容，可粘贴带 PEM 头尾的内容。 */
-    var andmuPrivateKey: String = "MIICdgIBADANBgkqhkiG9w0BAQEFAASCAmAwggJcAgEAAoGBAI/hVluB28WZFE59+lmEBJ5vVdkwZNGFJVh3O9MERcvvhpq88bi6byLCbXl/sh1c5XBbSVbusH5DT7a2ggj7lq8sQTc84Rpnj51QzN0R2uhNOYayGcz33+aCowiekw45Aw46d5uTWnmVPWaF+qXvjjlh+IrDnEpeeCYrswq2azb9AgMBAAECgYAmUz6+l0OkSddn5RS3nXvhfAShGsvwJ4hAHVqZJe01mnL/as70huytlJ62m3YlbiZLnHVXq7LlnyZvpAPVQrbrPf3DdF82snOogfctFxy1kxqYxMRYvA5GjIwXPOVoZBHUp4b98irJKlhh4IRxuKADTyFwftxOb4f5AhgepiBFHQJBAP7EQSNCnK+t0nF5IFwD9VbsMmJRmJ5MRkGmFSQHmo7QV3zEpWsAEEyI+LtUGRgEb1z72c4l5/Nmi6X0UurLB8sCQQCQk6fVRbImLxcW/6KD3ZjDS8qbDcQZ41z9aztopPqK+VIT8mEH60NrBs+1aVns6JFD7mYTtCl+HLJhekCvlpNXAkEA0lZ94PqyGmlMgdsbWFz8RdOklYAAnVEkADd65NBSTu68DIred8UJr+a2VRNN1IJ03zQf0w+AvXhAe7eIbclKmQJAFLyY/gYZH1DxxuKztKY8Gwbr8IFw9yWdWNvgkYnYRcas9x90u2YLLXa0pBiQRWK2M0Amc/0LVoNXMpQOYyD90QJAUSv5F311yZqfavUHpVLL0vaNIBWGwuz8WhmT6ZlbLJcDiJZ0DmJp/KKyf/vgfBDHq3+McN8VBV/nqf9mkZ4Drg=="
+    var andmuPrivateKey: String = "MIICeAIBADANBgkqhkiG9w0BAQEFAASCAmIwggJeAgEAAoGBAKvFTlptzKyXhBXKJwv11xeeuL7Dx9l2yCqiCeYn7mJUa+wLjwetq9gZA/70COLg9cOJxjWMJq626/cH/hXVj0cOTusxBpDAVfgi9WOBfikHQz98dCRzkHIPQSoFodK4kMtFl5sr8Sss/9n8H1scBzMIj0I8S2EV+xzk6ifHCYqNAgMBAAECgYEAkG8ZAlrfRqUk8LmJ+bmfQoI5MFcpvcbua0LTdg9PmKkKEnJps3gqTkxCmugSbMvie6hm3XHauQChC5hR44Qus5uIG7uvUEVPnCZz7csEz6+ZNtrE2+ts7eJBJzPoL5lWIPSagds1YLFEua3m4sr3IYla9YgP5f9YRwXEHUg3ReECQQDne86/EqWe+7J1GRK44qzDAv0lHgYbSyhENJNLU+2IVuSpw2G0j2GjLpIprIlxmF1tgAnUAKSbl4HAJhWpiJipAkEAvfaCNxlBL3dbBmPCQ6swSGP/5FMB6ulVaSUZ2zFSsvwLZdF0IGE8IqhMUhX63hFwU6RKYqoLD3Pu66YUQotdRQJBAIXXkxntaS+8blnAbo/SGHwFDWNZscQ0N4sALy49z7imLT5vBt5EjPqyIbbQ2QOCSnrWrlgTKxn/hvkXzCyjG0kCQBGTrZjLjWyG7rU4pdD9FgqctiC6TYMe8/g2pp3RgoVtLODO8J/OX3IVgHpX7k597pbOrNNUSJG1eHX1eApwOsECQQDcCFfCfakE3OvDo3Tbj0jT/+yG9mJaAyKAsW7O9Bh32jLJczgNaef9UFeJ3toikgzdFJ4kQyxJ4qfSnD4GGyo1"
 
     /** 请求头 version，按安牧接口规范参与签名。 */
     var andmuClientVersion: String = "1.0.0"
