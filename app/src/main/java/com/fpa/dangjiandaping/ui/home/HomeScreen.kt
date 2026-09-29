@@ -111,18 +111,21 @@ private enum class PartyWorkCategory(
     val label: String,
     val columnId: String,
     val onlyImage: Boolean,
+    val moreIndex: Int,
     @DrawableRes val coverImage: Int,
 ) {
     WorkDynamics(
         label = "工作动态",
         columnId = "1978746246661910530",
         onlyImage = true,
+        moreIndex = 0,
         coverImage = R.drawable.ic_home_gzdt_head,
     ),
     PioneerCommentary(
         label = "雪域先锋时评",
         columnId = "2009152698225565697",
         onlyImage = false,
+        moreIndex = 1,
         coverImage = R.drawable.ic_home_xyxf_head,
     );
 
@@ -151,7 +154,7 @@ internal fun HomeScreen(
     contentFocusRequester: FocusRequester? = null,
     onRequestTabFocus: () -> Unit = {},
     onCoursewareClick: (Int) -> Unit = {},
-    onPartyBuildingTabClick: () -> Unit = {},
+    onPartyBuildingTabClick: (Int) -> Unit = {},
     onMeetingClick: () -> Unit = {},
 ) {
     val context = LocalContext.current
@@ -1008,7 +1011,7 @@ private fun PartyWorkPanel(
     onCategorySelected: (PartyWorkCategory) -> Unit,
     onRetry: () -> Unit,
     onOpenArticle: (String) -> Unit,
-    onMoreClick: () -> Unit,
+    onMoreClick: (Int) -> Unit,
     modifier: Modifier = Modifier,
 ) {
     val displayItems = when (feedState) {
@@ -1046,7 +1049,7 @@ private fun PartyWorkPanel(
                 focusRequester = moreFocusRequester,
                 leftFocusRequester = reviewTabFocusRequester,
                 downFocusRequester = firstItemFocusRequester,
-                onClick = onMoreClick,
+                onClick = { onMoreClick(selectedCategory.moreIndex) },
                 modifier = Modifier.align(Alignment.CenterEnd),
             )
         }

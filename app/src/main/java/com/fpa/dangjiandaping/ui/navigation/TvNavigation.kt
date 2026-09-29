@@ -48,9 +48,9 @@ internal fun TvTabDestination.toRoute(tabIndex: Int): TvRoute = when (this) {
     is TvTabDestination.Web -> WebRoute(tabIndex = tabIndex, url = url)
 }
 
-internal fun partyBuildingRoute(channelId: Int): WebRoute = WebRoute(
+internal fun partyBuildingRoute(index: Int): WebRoute = WebRoute(
     tabIndex = partyBuildingTabIndex(),
-    url = "$jicengdangjian_URL?id=$channelId",
+    url = "$jicengdangjian_URL?type=2&index=$index",
 )
 
 internal fun coursewareRoute(type: Int): WebRoute = WebRoute(

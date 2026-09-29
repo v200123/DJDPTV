@@ -160,8 +160,8 @@ fun DangJianTvScreen(
         )
     }
 
-    fun openPartyBuilding(channelId: Int) {
-        val targetRoute = partyBuildingRoute(channelId)
+    fun openPartyBuilding(index: Int) {
+        val targetRoute = partyBuildingRoute(index)
         activateRoute(
             tabIndex = targetRoute.tabIndex,
             targetRoute = targetRoute,
@@ -368,9 +368,7 @@ fun DangJianTvScreen(
                             contentFocusRequester = contentFocusRequester,
                             onRequestTabFocus = ::requestSelectedTabFocus,
                             onCoursewareClick = ::openCourseware,
-                            onPartyBuildingTabClick = {
-                                activateTab(partyBuildingTabIndex(), moveFocusToContent = false)
-                            },
+                            onPartyBuildingTabClick = ::openPartyBuilding,
                             onMeetingClick = ::launchMeeting,
                         )
                     }

@@ -367,6 +367,8 @@ private fun LearningVideoPlayer(
     var displayedStudyDurationMs by remember { mutableLongStateOf(0L) }
     var showCaptureNotice by remember { mutableStateOf(true) }
     var videoFullscreen by remember { mutableStateOf(false) }
+    var nextSnapshotDueMs by remember { mutableLongStateOf(SNAPSHOT_INTERVAL_MILLIS) }
+    var snapshotPending by remember { mutableStateOf(false) }
 
     LaunchedEffect(playing) {
         if (!playing) return@LaunchedEffect
@@ -379,13 +381,27 @@ private fun LearningVideoPlayer(
         }
     }
 
-    // A pause cancels this effect. Therefore a snapshot is only requested after a full ten
-    // seconds of continuous playback and never while the player is paused or in the background.
+    // Keep capture deadlines on the playback clock, even while the camera is warming up.
+    // If a deadline passes before the camera is ready, take one catch-up snapshot as soon as
+    // it becomes available; later deadlines remain aligned to the same playback timeline.
     LaunchedEffect(playing, cameraReady) {
-        if (!playing || !cameraReady) return@LaunchedEffect
-        while (true) {
-            kotlinx.coroutines.delay(SNAPSHOT_INTERVAL_MILLIS)
+        if (!playing) return@LaunchedEffect
+        if (cameraReady && snapshotPending) {
+            snapshotPending = false
             onSnapshotDue()
+        }
+        while (true) {
+            val remainingMs = (nextSnapshotDueMs - displayedStudyDurationMs)
+                .coerceAtLeast(100L)
+            kotlinx.coroutines.delay(remainingMs)
+            if (displayedStudyDurationMs < nextSnapshotDueMs) continue
+
+            if (cameraReady) {
+                onSnapshotDue()
+            } else {
+                snapshotPending = true
+            }
+            nextSnapshotDueMs += SNAPSHOT_INTERVAL_MILLIS
         }
     }
 
@@ -419,7 +435,7 @@ private fun LearningVideoPlayer(
             } else {
                 Modifier
                     .fillMaxSize()
-                    .padding(start = 22.dp, top = 94.dp, end = 22.dp, bottom = 146.dp)
+                    .padding(start = 26.dp, top = 88.dp, end = 26.dp, bottom = 132.dp)
                     .shadow(12.dp, embeddedPlayerShape)
                     .clip(embeddedPlayerShape)
                     .border(1.dp, PARTY_RED_BORDER, embeddedPlayerShape)
@@ -439,7 +455,7 @@ private fun LearningVideoPlayer(
                 modifier = Modifier
                     .align(Alignment.TopCenter)
                     .fillMaxWidth()
-                    .padding(start = 22.dp, top = 16.dp, end = 22.dp),
+                    .padding(start = 26.dp, top = 14.dp, end = 26.dp),
             ) {
                 LearningVideoHeader(
                     title = videoTitle.ifBlank { "学习视频" },
@@ -453,7 +469,7 @@ private fun LearningVideoPlayer(
                 cameraReady = cameraReady,
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
-                    .padding(start = 22.dp, end = 22.dp, bottom = 16.dp),
+                    .padding(start = 26.dp, end = 26.dp, bottom = 16.dp),
             )
         }
 
@@ -467,7 +483,7 @@ private fun LearningVideoPlayer(
                     .align(Alignment.TopEnd)
                     .padding(
                         top = if (videoFullscreen) 18.dp else 112.dp,
-                        end = if (videoFullscreen) 18.dp else 40.dp,
+                        end = if (videoFullscreen) 18.dp else 38.dp,
                     ),
             )
         }
@@ -482,20 +498,27 @@ private fun LearningVideoHeader(
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(66.dp),
+            .height(58.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         LearningBackButton(onClick = onBack)
-        Spacer(Modifier.width(16.dp))
-        Text(
-            text = title,
-            modifier = Modifier.weight(1f),
-            color = PARTY_HEADER_TITLE,
-            fontSize = 25.sp,
-            fontWeight = FontWeight.Bold,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
+        Spacer(Modifier.width(13.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                color = PARTY_HEADER_TITLE,
+                fontSize = 23.sp,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            Text(
+                text = "党员教育  ·  学习时长同步记录",
+                color = PARTY_GOLD_LIGHT.copy(alpha = 0.86f),
+                fontSize = 12.sp,
+                maxLines = 1,
+            )
+        }
     }
 }
 
@@ -505,7 +528,8 @@ private fun LearningBackButton(onClick: () -> Unit) {
     val shape = RoundedCornerShape(12.dp)
     Box(
         modifier = Modifier
-            .size(50.dp)
+            .size(44.dp)
+            .shadow(if (focused) 8.dp else 2.dp, shape)
             .clip(shape)
             .background(if (focused) PARTY_RED else Color.White.copy(alpha = 0.94f))
             .border(
@@ -518,12 +542,34 @@ private fun LearningBackButton(onClick: () -> Unit) {
             .focusable(),
         contentAlignment = Alignment.Center,
     ) {
-        Text(
-            text = "‹",
-            color = if (focused) Color.White else PARTY_RED,
-            fontSize = 40.sp,
-            fontWeight = FontWeight.Bold,
-        )
+        val arrowColor = if (focused) Color.White else PARTY_RED
+        Canvas(modifier = Modifier.size(22.dp)) {
+            val stroke = 2.6.dp.toPx()
+            val left = size.width * 0.25f
+            val centerY = size.height * 0.5f
+            val shoulderX = size.width * 0.62f
+            drawLine(
+                color = arrowColor,
+                start = Offset(shoulderX, size.height * 0.22f),
+                end = Offset(left, centerY),
+                strokeWidth = stroke,
+                cap = androidx.compose.ui.graphics.StrokeCap.Round,
+            )
+            drawLine(
+                color = arrowColor,
+                start = Offset(left, centerY),
+                end = Offset(shoulderX, size.height * 0.78f),
+                strokeWidth = stroke,
+                cap = androidx.compose.ui.graphics.StrokeCap.Round,
+            )
+            drawLine(
+                color = arrowColor,
+                start = Offset(left + size.width * 0.04f, centerY),
+                end = Offset(size.width * 0.78f, centerY),
+                strokeWidth = stroke,
+                cap = androidx.compose.ui.graphics.StrokeCap.Round,
+            )
+        }
     }
 }
 
@@ -538,17 +584,17 @@ private fun LearningCaptureNotice(
     val shape = RoundedCornerShape(14.dp)
     Row(
         modifier = modifier
-            .width(390.dp)
-            .shadow(12.dp, shape)
+            .width(340.dp)
+            .shadow(10.dp, shape)
             .clip(shape)
             .background(Color(0xF7FFF9F5))
             .border(1.dp, PARTY_RED_BORDER, shape)
-            .padding(16.dp),
+            .padding(horizontal = 12.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier = Modifier
-                .size(58.dp)
+                .size(46.dp)
                 .clip(CircleShape)
                 .background(
                     Brush.linearGradient(
@@ -559,7 +605,7 @@ private fun LearningCaptureNotice(
         ) {
             CameraGlyph(tint = Color.White, modifier = Modifier.size(31.dp))
         }
-        Spacer(Modifier.width(14.dp))
+        Spacer(Modifier.width(11.dp))
         Column(modifier = Modifier.weight(1f)) {
             Text(
                 text = when {
@@ -568,7 +614,7 @@ private fun LearningCaptureNotice(
                     else -> "学习过程抓拍已暂停"
                 },
                 color = PARTY_TEXT_DARK,
-                fontSize = 18.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
             )
             Spacer(Modifier.height(4.dp))
@@ -579,14 +625,14 @@ private fun LearningCaptureNotice(
                     else -> "继续播放后重新计时，满 10 秒后自动抓拍"
                 },
                 color = if (cameraReady && playing) PARTY_TEXT_MUTED else PARTY_RED,
-                fontSize = 14.sp,
-                lineHeight = 20.sp,
+                fontSize = 12.sp,
+                lineHeight = 16.sp,
             )
         }
         Text(
             text = "×",
             color = PARTY_TEXT_MUTED,
-            fontSize = 28.sp,
+            fontSize = 24.sp,
             modifier = Modifier
                 .clip(CircleShape)
                 .clickable(onClick = onDismiss)
@@ -607,46 +653,46 @@ private fun LearningStatusPanel(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(116.dp)
-            .shadow(8.dp, shape)
+            .height(106.dp)
+            .shadow(7.dp, shape)
             .clip(shape)
-            .background(Color(0xF8FFFFFF))
+            .background(Color(0xF9FFFDFC))
             .border(1.dp, PARTY_RED_BORDER, shape)
-            .padding(14.dp),
+            .padding(horizontal = 12.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
             modifier = Modifier
-                .size(68.dp)
+                .size(50.dp)
                 .clip(CircleShape)
                 .background(PARTY_RED_SOFT),
             contentAlignment = Alignment.Center,
         ) {
             ClockGlyph(modifier = Modifier.size(38.dp))
         }
-        Spacer(Modifier.width(15.dp))
-        Column(modifier = Modifier.width(245.dp)) {
+        Spacer(Modifier.width(11.dp))
+        Column(modifier = Modifier.width(206.dp)) {
             Text(
                 text = "累计学习时长",
                 color = PARTY_TEXT_MUTED,
-                fontSize = 17.sp,
+                fontSize = 14.sp,
                 fontWeight = FontWeight.Medium,
             )
             Text(
                 text = formatStudyDuration(studyDurationMs),
                 color = PARTY_RED,
-                fontSize = 33.sp,
+                fontSize = 29.sp,
                 fontWeight = FontWeight.Bold,
             )
         }
         Box(
             modifier = Modifier
                 .fillMaxHeight()
-                .padding(vertical = 10.dp)
+                .padding(vertical = 8.dp)
                 .width(1.dp)
                 .background(PARTY_RED_BORDER),
         )
-        Spacer(Modifier.width(24.dp))
+        Spacer(Modifier.width(18.dp))
         Column(
             modifier = Modifier.weight(1f),
             verticalArrangement = Arrangement.Center,
@@ -654,71 +700,71 @@ private fun LearningStatusPanel(
             Text(
                 text = if (playing) "正在累计有效学习时间" else "视频已暂停，学习计时同步暂停",
                 color = PARTY_TEXT_DARK,
-                fontSize = 17.sp,
+                fontSize = 15.sp,
                 fontWeight = FontWeight.Bold,
             )
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .height(7.dp)
+                    .height(6.dp)
                     .clip(RoundedCornerShape(4.dp))
                     .background(PARTY_RED_SOFT),
             ) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(if (playing) 1f else 0.22f)
-                        .height(7.dp)
+                        .height(6.dp)
                         .background(
                             Brush.horizontalGradient(listOf(PARTY_RED, PARTY_RED_LIGHT)),
                         ),
                 )
             }
-            Spacer(Modifier.height(7.dp))
+            Spacer(Modifier.height(5.dp))
             Text(
                 text = "仅统计视频实际播放时长",
                 color = PARTY_TEXT_MUTED,
-                fontSize = 13.sp,
+                fontSize = 11.sp,
             )
         }
-        Spacer(Modifier.width(22.dp))
+        Spacer(Modifier.width(16.dp))
         Row(
             modifier = Modifier
-                .width(330.dp)
+                .width(252.dp)
                 .fillMaxHeight()
-                .clip(RoundedCornerShape(13.dp))
+                .clip(RoundedCornerShape(12.dp))
                 .background(
                     Brush.horizontalGradient(
                         listOf(PARTY_RED_DARK, PARTY_RED, PARTY_RED_LIGHT),
                     ),
                 )
-                .border(1.dp, PARTY_GOLD.copy(alpha = 0.7f), RoundedCornerShape(13.dp))
-                .padding(horizontal = 20.dp),
+                .border(1.dp, PARTY_GOLD.copy(alpha = 0.7f), RoundedCornerShape(12.dp))
+                .padding(horizontal = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Box(
                 modifier = Modifier
-                    .size(56.dp)
+                    .size(42.dp)
                     .clip(CircleShape)
                     .background(Color.White.copy(alpha = 0.14f))
                     .border(1.dp, PARTY_GOLD.copy(alpha = 0.7f), CircleShape),
                 contentAlignment = Alignment.Center,
             ) {
-                CameraGlyph(tint = Color.White, modifier = Modifier.size(30.dp))
+                CameraGlyph(tint = Color.White, modifier = Modifier.size(24.dp))
             }
-            Spacer(Modifier.width(15.dp))
+            Spacer(Modifier.width(11.dp))
             Column {
                 Text(
                     text = "本次学习凭证",
                     color = Color.White,
-                    fontSize = 19.sp,
+                    fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
                 )
-                Spacer(Modifier.height(5.dp))
+                Spacer(Modifier.height(3.dp))
                 Text(
                     text = if (cameraReady) "已抓拍 $captureCount 次" else "抓拍服务暂未就绪",
                     color = PARTY_GOLD_LIGHT,
-                    fontSize = 15.sp,
+                    fontSize = 12.sp,
                 )
             }
         }
