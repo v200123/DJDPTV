@@ -68,5 +68,6 @@ dependencies {
     implementation("io.github.carguo:gsyvideoplayer-exo2:13.1.0")
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

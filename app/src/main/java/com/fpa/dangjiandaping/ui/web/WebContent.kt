@@ -48,10 +48,7 @@ private data class WebViewDialogRequest(
     val url: String,
     val title: String?,
 )
-//internal const val MOBILE_BROWSER_USER_AGENT =
-//    "Mozilla/5.0 (Linux; Android 13; Mobile) AppleWebKit/537.36 " +
-//        "(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
-        internal const val MOBILE_BROWSER_USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Safari/537.36 Edg/151.0.0.0"
+internal const val MOBILE_BROWSER_USER_AGENT = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/151.0.0.0 Mobile Safari/537.36"
 private const val CAPTURE_WEB_FOCUS_SCRIPT =
     "(function(){var old=document.querySelector('[data-android-focus-return]');" +
         "if(old){old.removeAttribute('data-android-focus-return');}" +
@@ -195,6 +192,7 @@ internal fun WebContent(
     var videoActivityPausedHost by remember(url) { mutableStateOf(false) }
     val webViewHolder = remember { arrayOfNulls<WebView>(1) }
     val lifecycleOwner = LocalLifecycleOwner.current
+    val handleWebViewPermissionRequest = rememberWebViewPermissionHandler()
     var appInForeground by remember(lifecycleOwner) {
         mutableStateOf(lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED))
     }
@@ -459,6 +457,10 @@ internal fun WebContent(
                             }
                         }
                         webChromeClient = object : WebChromeClient() {
+                            override fun onPermissionRequest(request: android.webkit.PermissionRequest) {
+                                handleWebViewPermissionRequest(request)
+                            }
+
                             override fun onReceivedTitle(view: WebView, title: String?) {
                                 super.onReceivedTitle(view, title)
                                 view.contentDescription = title

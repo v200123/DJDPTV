@@ -1,7 +1,6 @@
 package com.fpa.dangjiandaping.network
 
 import android.content.Context
-import android.util.Log
 import com.fpa.dangjiandaping.config.GlobalVariables
 import com.fpa.dangjiandaping.network.model.AndmuDevice
 import com.fpa.dangjiandaping.network.model.AndmuDeviceListResult
@@ -9,11 +8,14 @@ import com.fpa.dangjiandaping.network.model.AndmuRealtimeThumbnailResult
 import com.fpa.dangjiandaping.network.model.AndmuTokenResult
 import com.fpa.dangjiandaping.network.model.AndmuWebSdkPlayerResult
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.ResponseBody
+import okhttp3.logging.HttpLoggingInterceptor
 import org.json.JSONObject
 import retrofit2.Response
 import retrofit2.Retrofit
@@ -23,6 +25,8 @@ import retrofit2.http.POST
 
 /** 安牧开放平台 Retrofit 客户端：负责 token 缓存、token 请求和设备列表请求。 */
 object AndmuApiClient {
+    private val tokenRefreshMutex = Mutex()
+
     /** 优先复用仍在 6 天安全窗口内的本地 token；没有可用缓存时才调用远端接口。 */
     suspend fun getCachedOrRequestApplicationToken(context: Context): AndmuTokenResult {
         readCachedToken(context)?.let { cached ->
@@ -54,6 +58,67 @@ object AndmuApiClient {
         GlobalVariables.andmuTokenExpiresAtMillis = 0L
     }
 
+    suspend fun requestDeviceListWithTokenRefresh(
+        context: Context,
+        token: String,
+    ): AndmuDeviceListResult = requestWithTokenRefresh(
+        context = context,
+        token = token,
+        request = { currentToken -> requestDeviceList(currentToken) },
+        resultCode = AndmuDeviceListResult::resultCode,
+    )
+
+    suspend fun requestRealtimeThumbnailUrlWithTokenRefresh(
+        context: Context,
+        token: String,
+        deviceId: String,
+    ): AndmuRealtimeThumbnailResult = requestWithTokenRefresh(
+        context = context,
+        token = token,
+        request = { currentToken -> requestRealtimeThumbnailUrl(currentToken, deviceId) },
+        resultCode = AndmuRealtimeThumbnailResult::resultCode,
+    )
+
+    suspend fun requestWebSdkPlayerUrlWithTokenRefresh(
+        context: Context,
+        token: String,
+        deviceId: String,
+    ): AndmuWebSdkPlayerResult = requestWithTokenRefresh(
+        context = context,
+        token = token,
+        request = { currentToken -> requestWebSdkPlayerUrl(currentToken, deviceId) },
+        resultCode = AndmuWebSdkPlayerResult::resultCode,
+    )
+
+    private suspend fun <T> requestWithTokenRefresh(
+        context: Context,
+        token: String,
+        request: suspend (String) -> T,
+        resultCode: (T) -> String,
+    ): T {
+        val currentToken = GlobalVariables.andmuToken
+            .takeIf { it.isNotBlank() && it != token }
+            ?: token
+        val firstResult = request(currentToken)
+        if (resultCode(firstResult) != TOKEN_EXPIRED_CODE) return firstResult
+
+        val refreshedToken = tokenRefreshMutex.withLock {
+            val tokenUpdatedByAnotherRequest = GlobalVariables.andmuToken
+                .takeIf { it.isNotBlank() && it != currentToken }
+            if (tokenUpdatedByAnotherRequest != null) {
+                tokenUpdatedByAnotherRequest
+            } else {
+                clearCachedApplicationToken(context)
+                getCachedOrRequestApplicationToken(context).let { tokenResult ->
+                    require(tokenResult.isSuccess) {
+                        tokenResult.resultMessage.ifBlank { "token 已过期，重新获取失败。" }
+                    }
+                    tokenResult.token.orEmpty()
+                }
+            }
+        }
+        return request(refreshedToken)
+    }
     /** 使用有效 token 获取第 1 页最多 100 条在线设备。 */
     suspend fun requestDeviceList(token: String): AndmuDeviceListResult = withContext(Dispatchers.IO) {
         require(token.isNotBlank()) { "获取设备列表需要有效的安牧 token。" }
@@ -254,28 +319,29 @@ object AndmuApiClient {
             .create(AndmuApi::class.java)
     }
 
+    private val httpLoggingInterceptor by lazy {
+        HttpLoggingInterceptor { message ->
+            android.util.Log.i(LOG_TAG, redactSensitiveLogValues(message))
+        }.apply {
+            level = HttpLoggingInterceptor.Level.BODY
+            redactHeader("token")
+            redactHeader("signature")
+        }
+    }
+
     private val httpClient: OkHttpClient by lazy {
         OkHttpClient.Builder()
-            .addInterceptor { chain ->
-                val request = chain.request()
-                try {
-                    chain.proceed(request).also { response ->
-                        Log.i(
-                            LOG_TAG,
-                            "Retrofit 响应：${request.method} ${request.url}，" +
-                                "HTTP ${response.code}，responseJson=" +
-                                response.peekBody(LOG_RESPONSE_BODY_MAX_BYTES).string(),
-                        )
-                    }
-                } catch (error: Exception) {
-                    Log.e(LOG_TAG, "Retrofit 请求失败：${request.method} ${request.url}", error)
-                    throw error
-                }
-            }
+            .addInterceptor(httpLoggingInterceptor)
             .build()
     }
 
+    private fun redactSensitiveLogValues(message: String): String =
+        SENSITIVE_JSON_VALUE_REGEX.replace(message) { match ->
+            "${match.groupValues[1]}[REDACTED]${match.groupValues[2]}"
+        }
+
     private const val SUCCESS_CODE = "000000"
+    private const val TOKEN_EXPIRED_CODE = "11504"
     private const val LOG_TAG = "AndmuApiClient"
     private const val ANDMU_BASE_URL = "https://open.qly.cmviot.cn/"
     private const val PREFERENCES_NAME = "andmu_token_cache"
@@ -283,6 +349,9 @@ object AndmuApiClient {
     private const val KEY_EXPIRES_AT_MILLIS = "expires_at_millis"
     private const val KEY_RAW_RESPONSE_JSON = "raw_response_json"
     private const val LOCAL_TOKEN_VALIDITY_MILLIS = 6L * 24 * 60 * 60 * 1_000L
-    private const val LOG_RESPONSE_BODY_MAX_BYTES = 1_048_576L
+    private val SENSITIVE_JSON_VALUE_REGEX = Regex(
+        "(\"(?:token|sig|signature|secret|privateKey)\"\\s*:\\s*\")[^\"]*(\")",
+        RegexOption.IGNORE_CASE,
+    )
     private val JSON_MEDIA_TYPE = "application/json; charset=utf-8".toMediaType()
 }

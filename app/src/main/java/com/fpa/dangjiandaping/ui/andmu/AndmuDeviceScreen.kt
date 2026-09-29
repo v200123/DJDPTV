@@ -149,7 +149,11 @@ internal fun AndmuDeviceScreen(
                         runCatching {
                             val token = GlobalVariables.andmuToken
                             require(token.isNotBlank()) { "没有可用的千里眼 token。" }
-                            AndmuApiClient.requestWebSdkPlayerUrl(token, item.device.deviceId)
+                            AndmuApiClient.requestWebSdkPlayerUrlWithTokenRefresh(
+                                context = context,
+                                token = token,
+                                deviceId = item.device.deviceId,
+                            )
                         }.onSuccess { playerResult ->
                             if (playerResult.resultCode == SUCCESS_CODE &&
                                 !playerResult.playerUrl.isNullOrBlank()

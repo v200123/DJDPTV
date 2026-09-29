@@ -54,22 +54,16 @@ internal object AndmuDeviceStore {
         storeScope.launch {
             val deviceListResult = runCatching {
                 require(GlobalVariables.isAndmuConfigured) { "请先填写千里眼应用凭据。" }
-                var tokenResult = AndmuApiClient.getCachedOrRequestApplicationToken(appContext)
+                val tokenResult = AndmuApiClient.getCachedOrRequestApplicationToken(appContext)
                 require(tokenResult.isSuccess) { tokenResult.resultMessage.ifBlank { "获取 token 失败。" } }
-                var deviceResult = AndmuApiClient.requestDeviceList(tokenResult.token.orEmpty())
-                if (deviceResult.resultMessage.trim() == TOKEN_EXPIRED_MESSAGE) {
-                    // 服务端 token 的有效状态优先于本地过期时间；仅清一次并只重试一次。
-                    AndmuApiClient.clearCachedApplicationToken(appContext)
-                    tokenResult = AndmuApiClient.getCachedOrRequestApplicationToken(appContext)
-                    require(tokenResult.isSuccess) {
-                        tokenResult.resultMessage.ifBlank { "重新获取 token 失败。" }
-                    }
-                    deviceResult = AndmuApiClient.requestDeviceList(tokenResult.token.orEmpty())
-                }
+                val deviceResult = AndmuApiClient.requestDeviceListWithTokenRefresh(
+                    appContext,
+                    tokenResult.token.orEmpty(),
+                )
                 require(deviceResult.resultCode == SUCCESS_CODE) {
                     deviceResult.resultMessage.ifBlank { "获取在线设备列表失败。" }
                 }
-                tokenResult.token.orEmpty() to deviceResult.devices
+                GlobalVariables.andmuToken to deviceResult.devices
             }
             val (token, devices) = deviceListResult.getOrElse { error ->
                 mutableState.value = mutableState.value.copy(
@@ -95,19 +89,28 @@ internal object AndmuDeviceStore {
                 cameras = cameras,
             )
             loadRealtimeThumbnails(
+                context = appContext,
                 token = token,
                 devices = devices.filter { existingThumbnailByDeviceId[it.deviceId].isNullOrBlank() },
             )
         }
     }
 
-    private suspend fun loadRealtimeThumbnails(token: String, devices: List<AndmuDevice>) {
+    private suspend fun loadRealtimeThumbnails(
+        context: Context,
+        token: String,
+        devices: List<AndmuDevice>,
+    ) {
         for (deviceChunk in devices.filter { it.deviceStatus == 1 && it.deviceId.isNotBlank() }.chunked(4)) {
             val updates = coroutineScope {
                 deviceChunk.map { device ->
                     async {
                         val thumbnail = runCatching {
-                            AndmuApiClient.requestRealtimeThumbnailUrl(token, device.deviceId)
+                            AndmuApiClient.requestRealtimeThumbnailUrlWithTokenRefresh(
+                                context,
+                                token,
+                                device.deviceId,
+                            )
                         }.getOrNull()
                         device.deviceId to thumbnail
                             ?.takeIf { it.resultCode == SUCCESS_CODE }
@@ -131,4 +134,3 @@ internal object AndmuDeviceStore {
 }
 
 private const val SUCCESS_CODE = "000000"
-private const val TOKEN_EXPIRED_MESSAGE = "token已过期"

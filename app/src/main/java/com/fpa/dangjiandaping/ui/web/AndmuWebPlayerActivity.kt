@@ -138,6 +138,7 @@ private fun AndmuWebPlayer(
     onBack: () -> Unit,
 ) {
     val backFocusRequester = remember { FocusRequester() }
+    val handleWebViewPermissionRequest = rememberWebViewPermissionHandler()
     val webViewFocusRequester = remember { FocusRequester() }
 
     DisposableEffect(virtualPointer) {
@@ -171,14 +172,19 @@ private fun AndmuWebPlayer(
                     settings.javaScriptEnabled = true
                     settings.domStorageEnabled = true
                     settings.mediaPlaybackRequiresUserGesture = false
+                    settings.userAgentString = MOBILE_BROWSER_USER_AGENT
                     // WebSDK 页面按当前电视窗口尺寸布局，避免被概览模式缩放到顶部一小块。
                     settings.loadWithOverviewMode = false
-                    settings.useWideViewPort = false
+                    settings.useWideViewPort = true
                     setInitialScale(100)
                     setBackgroundColor(android.graphics.Color.BLACK)
                     isFocusable = true
                     isFocusableInTouchMode = true
-                    webChromeClient = WebChromeClient()
+                    webChromeClient = object : WebChromeClient() {
+                        override fun onPermissionRequest(request: android.webkit.PermissionRequest) {
+                            handleWebViewPermissionRequest(request)
+                        }
+                    }
                     webViewClient = WebViewClient()
                     virtualPointer.attach(this)
                     loadUrl(url)

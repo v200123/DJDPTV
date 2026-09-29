@@ -72,6 +72,7 @@ internal fun WebViewDialog(
     onDismiss: () -> Unit,
 ) {
     val closeFocusRequester = remember { FocusRequester() }
+    val handleWebViewPermissionRequest = rememberWebViewPermissionHandler()
     val webViewHolder = remember { arrayOfNulls<WebView>(1) }
     val requestedTitle = title?.trim()?.takeIf(String::isNotEmpty)
     var pageTitle by remember(url, requestedTitle) {
@@ -193,6 +194,10 @@ internal fun WebViewDialog(
                                 }
                             }
                             webChromeClient = object : WebChromeClient() {
+                                override fun onPermissionRequest(request: android.webkit.PermissionRequest) {
+                                    handleWebViewPermissionRequest(request)
+                                }
+
                                 override fun onReceivedTitle(view: WebView, title: String?) {
                                     super.onReceivedTitle(view, title)
                                     if (requestedTitle == null) {
