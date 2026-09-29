@@ -152,10 +152,16 @@ private fun AndmuWebPlayer(
 
     LaunchedEffect(Unit) {
         withFrameNanos { }
-        backFocusRequester.requestFocus()
+        webViewFocusRequester.requestFocus()
     }
 
-    BackHandler(onBack = onBack)
+    BackHandler {
+        if (virtualPointer.pointerVisible) {
+            virtualPointer.requestExitFocus()
+        } else {
+            onBack()
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -185,7 +191,22 @@ private fun AndmuWebPlayer(
                             handleWebViewPermissionRequest(request)
                         }
                     }
-                    webViewClient = WebViewClient()
+                    webViewClient = object : WebViewClient() {
+                        override fun onPageFinished(view: WebView, pageUrl: String?) {
+                            super.onPageFinished(view, pageUrl)
+                            // Disable Chromium's temporary tap highlight; it can look like
+                            // a dark overlay when the remote pointer dispatches a touch.
+                            view.evaluateJavascript(
+                                "(function(){var s=document.getElementById('__android_remote_tap_style');"
+                                    + "if(!s){s=document.createElement('style');"
+                                    + "s.id='__android_remote_tap_style';"
+                                    + "(document.head||document.documentElement).appendChild(s);}"
+                                    + "s.textContent='*{-webkit-tap-highlight-color:rgba(0,0,0,0)!important;}';"
+                                    + "})();",
+                                null,
+                            )
+                        }
+                    }
                     virtualPointer.attach(this)
                     loadUrl(url)
                 }
@@ -240,7 +261,7 @@ private fun AndmuWebPlayer(
                 modifier = Modifier.weight(1f),
             )
             Text(
-                text = "方向键移动 · 确认点击",
+                text = "方向键移动 · 确认点击 · 按住确认键拖动",
                 color = androidx.compose.ui.graphics.Color(0xFFE0E0E0),
                 fontSize = 14.sp,
             )
@@ -317,8 +338,8 @@ private fun TvBackButton(
 private val ConfirmKeys = setOf(Key.DirectionCenter, Key.Enter, Key.NumPadEnter)
 
 /**
- * 使用原生触摸事件点击 WebView，而非向网页派发不受信任的 JavaScript click 事件。
- * 因此对于跨域 iframe、Canvas 及自绘播放器控件同样有效。
+ * Emulates a mouse pointer for WebView: directional keys send hover/move events,
+ * and holding OK while moving sends a primary-button drag.
  */
 private class WebViewVirtualPointer {
     var pointerX by mutableStateOf(-1f)
@@ -330,25 +351,50 @@ private class WebViewVirtualPointer {
 
     private var webView: WebView? = null
     private var pointerEnabled = false
+    private var pointerHovering = false
+    private var primaryButtonDown = false
+    private var mouseDownTime = 0L
     private var onExitPointerMode: (() -> Unit)? = null
 
     fun attach(webView: WebView) {
         this.webView = webView
-        webView.post(::ensurePointerInBounds)
+        webView.post {
+            ensurePointerInBounds()
+            if (pointerEnabled && !pointerHovering) {
+                dispatchHover(MotionEvent.ACTION_HOVER_ENTER)
+                pointerHovering = true
+            }
+        }
     }
 
     fun detach(releasedWebView: WebView? = null) {
         if (releasedWebView == null || releasedWebView === webView) {
+            setPointerEnabled(false)
             webView = null
-            pointerEnabled = false
             pointerVisible = false
         }
     }
 
     fun setPointerEnabled(enabled: Boolean) {
+        if (pointerEnabled == enabled) return
+        if (!enabled) {
+            releasePrimaryButton()
+            dispatchHover(MotionEvent.ACTION_HOVER_EXIT)
+            pointerHovering = false
+        }
         pointerEnabled = enabled
         pointerVisible = enabled
-        if (enabled) webView?.post(::ensurePointerInBounds)
+        if (enabled) {
+            webView?.post {
+                ensurePointerInBounds()
+                dispatchHover(MotionEvent.ACTION_HOVER_ENTER)
+                pointerHovering = true
+            }
+        }
+    }
+
+    fun requestExitFocus() {
+        onExitPointerMode?.invoke()
     }
 
     fun setOnExitPointerMode(listener: (() -> Unit)?) {
@@ -359,7 +405,10 @@ private class WebViewVirtualPointer {
         if (!pointerEnabled) return false
         val keyCode = event.keyCode
         if (keyCode !in PointerKeyCodes) return false
-        if (event.action == KeyEvent.ACTION_UP) return true
+        if (event.action == KeyEvent.ACTION_UP) {
+            if (keyCode in ConfirmKeyCodes) releasePrimaryButton()
+            return true
+        }
         if (event.action != KeyEvent.ACTION_DOWN) return true
 
         return when (keyCode) {
@@ -367,7 +416,10 @@ private class WebViewVirtualPointer {
             KeyEvent.KEYCODE_DPAD_RIGHT -> moveBy(pointerStep(event), 0f)
             KeyEvent.KEYCODE_DPAD_DOWN -> moveBy(0f, pointerStep(event))
             KeyEvent.KEYCODE_DPAD_UP -> moveBy(0f, -pointerStep(event))
-            else -> tap()
+            else -> {
+                if (event.repeatCount == 0) pressPrimaryButton()
+                true
+            }
         }
     }
 
@@ -382,32 +434,109 @@ private class WebViewVirtualPointer {
 
         // 指针已在顶边时，主动回到原生返回按钮，不能交给 WebView 消费。
         if (deltaY < 0f && nextY == bounds.top) {
+            releasePrimaryButton()
             setPointerEnabled(false)
             onExitPointerMode?.invoke()
             return true
         }
         pointerX = nextX
         pointerY = nextY
+        if (primaryButtonDown) {
+            dispatchTouchGesture(MotionEvent.ACTION_MOVE)
+        } else {
+            if (!pointerHovering) {
+                dispatchHover(MotionEvent.ACTION_HOVER_ENTER)
+                pointerHovering = true
+            } else {
+                dispatchHover(MotionEvent.ACTION_HOVER_MOVE)
+            }
+        }
         return true
     }
 
-    private fun tap(): Boolean {
-        val view = webView ?: return false
-        val bounds = webViewBounds() ?: return false
+    private fun pressPrimaryButton(): Boolean {
+        if (primaryButtonDown) return true
         ensurePointerInBounds()
-        val x = (pointerX - bounds.left).coerceIn(0f, bounds.width - 1f)
-        val y = (pointerY - bounds.top).coerceIn(0f, bounds.height - 1f)
-        val downTime = android.os.SystemClock.uptimeMillis()
-        MotionEvent.obtain(downTime, downTime, MotionEvent.ACTION_DOWN, x, y, 0).also {
-            view.dispatchTouchEvent(it)
-            it.recycle()
-        }
-        val upTime = android.os.SystemClock.uptimeMillis()
-        MotionEvent.obtain(downTime, upTime, MotionEvent.ACTION_UP, x, y, 0).also {
-            view.dispatchTouchEvent(it)
-            it.recycle()
-        }
+        dispatchHover(MotionEvent.ACTION_HOVER_EXIT)
+        pointerHovering = false
+        mouseDownTime = android.os.SystemClock.uptimeMillis()
+        primaryButtonDown = true
+        dispatchTouchGesture(MotionEvent.ACTION_DOWN)
         return true
+    }
+
+    private fun releasePrimaryButton() {
+        if (!primaryButtonDown) return
+        dispatchTouchGesture(MotionEvent.ACTION_UP)
+        primaryButtonDown = false
+        if (pointerEnabled) {
+            dispatchHover(MotionEvent.ACTION_HOVER_ENTER)
+            pointerHovering = true
+        }
+    }
+
+    private fun dispatchHover(action: Int) {
+        val view = webView ?: return
+        val (x, y) = localPointerPosition() ?: return
+        val now = android.os.SystemClock.uptimeMillis()
+        createMouseEvent(action, x, y, 0, now).also { event ->
+            view.dispatchGenericMotionEvent(event)
+            event.recycle()
+        }
+    }
+
+    private fun dispatchTouchGesture(action: Int) {
+        val view = webView ?: return
+        val (x, y) = localPointerPosition() ?: return
+        val now = android.os.SystemClock.uptimeMillis()
+        val downTime = if (primaryButtonDown) mouseDownTime else now
+        MotionEvent.obtain(downTime, now, action, x, y, 0).also { event ->
+            event.source = android.view.InputDevice.SOURCE_TOUCHSCREEN
+            view.dispatchTouchEvent(event)
+            event.recycle()
+        }
+    }
+
+    private fun createMouseEvent(
+        action: Int,
+        x: Float,
+        y: Float,
+        buttonState: Int,
+        eventTime: Long,
+        downTime: Long = eventTime,
+    ): MotionEvent {
+        val properties = MotionEvent.PointerProperties().apply {
+            id = 0
+            toolType = MotionEvent.TOOL_TYPE_MOUSE
+        }
+        val coordinates = MotionEvent.PointerCoords().apply {
+            this.x = x
+            this.y = y
+            pressure = if (buttonState == 0) 0f else 1f
+            size = 1f
+        }
+        return MotionEvent.obtain(
+            downTime,
+            eventTime,
+            action,
+            1,
+            arrayOf(properties),
+            arrayOf(coordinates),
+            0,
+            buttonState,
+            1f,
+            1f,
+            0,
+            0,
+            android.view.InputDevice.SOURCE_MOUSE,
+            0,
+        )
+    }
+
+    private fun localPointerPosition(): Pair<Float, Float>? {
+        val bounds = webViewBounds() ?: return null
+        ensurePointerInBounds()
+        return (pointerX - bounds.left) to (pointerY - bounds.top)
     }
 
     private fun ensurePointerInBounds() {
@@ -448,15 +577,17 @@ private class WebViewVirtualPointer {
     }
 
     private companion object {
-        val PointerKeyCodes = setOf(
-            KeyEvent.KEYCODE_DPAD_LEFT,
-            KeyEvent.KEYCODE_DPAD_RIGHT,
-            KeyEvent.KEYCODE_DPAD_UP,
-            KeyEvent.KEYCODE_DPAD_DOWN,
+        val ConfirmKeyCodes = setOf(
             KeyEvent.KEYCODE_DPAD_CENTER,
             KeyEvent.KEYCODE_ENTER,
             KeyEvent.KEYCODE_NUMPAD_ENTER,
             KeyEvent.KEYCODE_BUTTON_A,
+        )
+        val PointerKeyCodes = ConfirmKeyCodes + setOf(
+            KeyEvent.KEYCODE_DPAD_LEFT,
+            KeyEvent.KEYCODE_DPAD_RIGHT,
+            KeyEvent.KEYCODE_DPAD_UP,
+            KeyEvent.KEYCODE_DPAD_DOWN,
         )
     }
 }
