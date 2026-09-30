@@ -1,5 +1,6 @@
 package com.fpa.dangjiandaping.ui.home
 
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -38,6 +39,7 @@ import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.withFrameNanos
@@ -54,6 +56,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.Shape
@@ -87,6 +90,9 @@ import com.shuyu.gsyvideoplayer.compose.native_.GSYPlayerSurface
 import com.shuyu.gsyvideoplayer.compose.native_.rememberGSYPlayerController
 import com.shuyu.gsyvideoplayer.video.base.GSYVideoView
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import java.net.URL
 
 private const val DEFAULT_HOME_VIDEO_URL = "https://12371wbndtxy.liveplay.myqcloud.com/12371wbnd/dangyuanwang_2/index.m3u8"
 private const val PARTY_PIONEER_MOBILE_URL = "https://12371.people.com.cn/"
@@ -1026,6 +1032,7 @@ private fun PartyWorkPanel(
                     id = article.id,
                     title = article.title,
                     publishedAt = article.publishedAt,
+                    imageUrl = article.imageUrl,
                     detailUrl = selectedCategory.detailUrl(article.id),
                 )
             }
@@ -1224,6 +1231,7 @@ private fun PartyWorkCard(
                 }
                 Spacer(Modifier.width(8.dp))
                 PartyWorkBadge(
+                    imageUrl = item.imageUrl,
                     coverImage = coverImage,
                     modifier = Modifier.fillMaxHeight(),
                 )
@@ -1234,20 +1242,37 @@ private fun PartyWorkCard(
 
 @Composable
 private fun PartyWorkBadge(
+    imageUrl: String?,
     @DrawableRes coverImage: Int,
     modifier: Modifier = Modifier,
 ) {
-    Image(
-        painter = painterResource(coverImage),
-        contentDescription = null,
-        contentScale = ContentScale.FillBounds,
-        modifier = modifier
-            .width(58.dp)
-            .clip(RoundedCornerShape(3.dp))
-            .border(1.dp, Color(0x55FA6A54), RoundedCornerShape(3.dp)),
-    )
+    val bitmap by produceState<android.graphics.Bitmap?>(initialValue = null, key1 = imageUrl) {
+        value = imageUrl?.takeIf(String::isNotBlank)?.let { url ->
+            withContext(Dispatchers.IO) {
+                runCatching { URL(url).openStream().use(BitmapFactory::decodeStream) }.getOrNull()
+            }
+        }
+    }
+    val badgeModifier = modifier
+        .width(58.dp)
+        .clip(RoundedCornerShape(3.dp))
+        .border(1.dp, Color(0x55FA6A54), RoundedCornerShape(3.dp))
+    if (bitmap == null) {
+        Image(
+            painter = painterResource(coverImage),
+            contentDescription = null,
+            contentScale = ContentScale.FillBounds,
+            modifier = badgeModifier,
+        )
+    } else {
+        Image(
+            bitmap = bitmap!!.asImageBitmap(),
+            contentDescription = null,
+            contentScale = ContentScale.FillBounds,
+            modifier = badgeModifier,
+        )
+    }
 }
-
 @Composable
 private fun PartyWorkMoreButton(
     focusRequester: FocusRequester,
@@ -1292,6 +1317,7 @@ private data class PartyWorkDisplayItem(
     val title: String,
     val publishedAt: String,
     val detailUrl: String? = null,
+    val imageUrl: String? = null,
 )
 
 private const val PARTY_WORK_VISIBLE_COUNT = 3

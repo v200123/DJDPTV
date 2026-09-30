@@ -2,6 +2,7 @@ package com.fpa.dangjiandaping.ui.web
 
 import android.annotation.SuppressLint
 import android.graphics.Color
+import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
@@ -9,16 +10,26 @@ import android.view.WindowManager
 import android.webkit.WebChromeClient
 import android.webkit.WebView
 import android.webkit.WebViewClient
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
@@ -31,16 +42,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.viewinterop.AndroidView
-import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.tv.material3.Text
+import com.fpa.dangjiandaping.R
 import com.fpa.dangjiandaping.ui.login.LocalBigScreenDeviceLoginResult
 
 private const val SCALE_WIDE_PAGE_SCRIPT =
@@ -71,6 +85,7 @@ internal fun WebViewDialog(
     val webViewHolder = remember { arrayOfNulls<WebView>(1) }
     val loginResultJson = LocalBigScreenDeviceLoginResult.current.toH5LoginResultJson()
     val requestedTitle = title?.trim()?.takeIf(String::isNotEmpty)
+    var isPageLoading by remember(url) { mutableStateOf(true) }
     var pageTitle by remember(url, requestedTitle) {
         mutableStateOf(requestedTitle ?: "网页详情")
     }
@@ -98,7 +113,8 @@ internal fun WebViewDialog(
         ) {
             Column(
                 modifier = Modifier
-                    .fillMaxSize(0.8f)
+                    .fillMaxWidth(0.9f)
+                    .fillMaxHeight(0.95f)
                     .tvDialogPanel(RoundedCornerShape(12.dp))
                     .padding(horizontal = 12.dp, vertical = 12.dp),
             ) {
@@ -123,14 +139,17 @@ internal fun WebViewDialog(
                     )
                 }
                 Spacer(Modifier.height(8.dp))
-                AndroidView(
+                Box(
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f)
                         .clip(RoundedCornerShape(8.dp))
-                    .background(HelpDialogWarmWhite)
-                    .border(1.dp, HelpDialogGoldBorder, RoundedCornerShape(8.dp)),
-                    factory = { context ->
+                        .background(HelpDialogWarmWhite)
+                        .border(1.dp, HelpDialogGoldBorder, RoundedCornerShape(8.dp)),
+                ) {
+                    AndroidView(
+                        modifier = Modifier.fillMaxSize(),
+                        factory = { context ->
                         CommonWebView(context, url, loginResultJson).apply {
                             webViewHolder[0] = this
                             layoutParams = ViewGroup.LayoutParams(
@@ -146,9 +165,45 @@ internal fun WebViewDialog(
                                 }
                                 false
                             }
+                            setOnKeyListener { view, keyCode, event ->
+                                if (event.action != KeyEvent.ACTION_DOWN) {
+                                    false
+                                } else {
+                                    val direction = when (keyCode) {
+                                        KeyEvent.KEYCODE_DPAD_UP -> -1
+                                        KeyEvent.KEYCODE_DPAD_DOWN -> 1
+                                        else -> 0
+                                    }
+                                    if (direction != 0 && view.canScrollVertically(direction)) {
+                                        val scrollStepPx = (72 * resources.displayMetrics.density).toInt()
+                                            .coerceAtLeast(1)
+                                        view.scrollBy(0, direction * scrollStepPx)
+                                        true
+                                    } else {
+                                        false
+                                    }
+                                }
+                            }
                             webViewClient = object : WebViewClient() {
+                                override fun onPageStarted(view: WebView, url: String?, favicon: android.graphics.Bitmap?) {
+                                    super.onPageStarted(view, url, favicon)
+                                    isPageLoading = true
+                                }
+
+                                override fun onReceivedError(
+                                    view: WebView,
+                                    request: android.webkit.WebResourceRequest,
+                                    error: android.webkit.WebResourceError,
+                                ) {
+                                    super.onReceivedError(view, request, error)
+                                    if (request.isForMainFrame) {
+                                        isPageLoading = false
+                                    }
+                                }
+
                                 override fun onPageFinished(view: WebView, url: String?) {
                                     super.onPageFinished(view, url)
+                                    isPageLoading = false
                                     // Some pages finish laying out shortly after onPageFinished.
                                     view.postDelayed(
                                         {
@@ -188,6 +243,7 @@ internal fun WebViewDialog(
                         val commonWebView = webView as? CommonWebView
                         if (commonWebView?.requestUrl != url) {
                             pageTitle = requestedTitle ?: "网页详情"
+                            isPageLoading = true
                             commonWebView?.updateRequestUrl(url, loginResultJson)
                             webView.loadUrl(url)
                         } else {
@@ -204,7 +260,11 @@ internal fun WebViewDialog(
                         webView.removeAllViews()
                         webView.destroy()
                     },
-                )
+                    )
+                    if (isPageLoading) {
+                        WebPageLoadingOverlay(Modifier.fillMaxSize())
+                    }
+                }
             }
         }
     }
@@ -214,4 +274,39 @@ internal fun WebViewDialog(
         closeFocusRequester.requestFocus()
     }
 
+}
+
+@Composable
+private fun WebPageLoadingOverlay(modifier: Modifier = Modifier) {
+    val transition = rememberInfiniteTransition(label = "webPageLoading")
+    val rotation by transition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 900, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart,
+        ),
+        label = "webPageLoadingRotation",
+    )
+    Box(
+        modifier = modifier.background(HelpDialogWarmWhite),
+        contentAlignment = Alignment.Center,
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Image(
+                painter = painterResource(R.drawable.ic_web_loading),
+                contentDescription = "网页加载中",
+                modifier = Modifier.size(58.dp).graphicsLayer { rotationZ = rotation },
+            )
+            Text(
+                text = "网页加载中…",
+                color = androidx.compose.ui.graphics.Color(0xFF8C251D),
+                fontSize = 15.sp,
+                fontWeight = FontWeight.Medium,
+            )
+        }
+    }
 }

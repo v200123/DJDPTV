@@ -49,11 +49,13 @@ import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
@@ -420,35 +422,50 @@ private fun LearningVideoPlayer(
                 ),
             ),
     ) {
-        FullscreenVideoPlayer(
-            videoUrl = videoUrl,
-            videoTitle = videoTitle.ifBlank { "学习视频" },
-            startPositionMs = 0L,
-            autoPlay = true,
-            onExit = onExit,
-            onPlaybackStateChanged = { isPlaying ->
-                playing = isPlaying
-                onPlaybackStateChanged(isPlaying)
-            },
-            modifier = if (videoFullscreen) {
-                Modifier.fillMaxSize()
-            } else {
-                Modifier
-                    .fillMaxSize()
-                    .padding(start = 26.dp, top = 88.dp, end = 26.dp, bottom = 132.dp)
-                    .shadow(12.dp, embeddedPlayerShape)
-                    .clip(embeddedPlayerShape)
-                    .border(1.dp, PARTY_RED_BORDER, embeddedPlayerShape)
-            },
-            showTopBar = false,
-            isFullscreen = videoFullscreen,
-            onFullscreenToggle = { videoFullscreen = !videoFullscreen },
-            onBackRequest = if (videoFullscreen) {
-                { videoFullscreen = false }
-            } else {
-                null
-            },
-        )
+        val videoPlayerModifier = if (videoFullscreen) {
+            Modifier.fillMaxSize()
+        } else {
+            Modifier
+                .fillMaxSize()
+                .padding(start = 26.dp, top = 88.dp, end = 26.dp, bottom = 110.dp)
+                .shadow(12.dp, embeddedPlayerShape)
+                .clip(embeddedPlayerShape)
+                .border(1.dp, PARTY_RED_BORDER, embeddedPlayerShape)
+        }
+        if (LocalInspectionMode.current) {
+            Box(
+                modifier = videoPlayerModifier.background(Color.Black),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    text = "学习视频预览",
+                    color = Color.White.copy(alpha = 0.45f),
+                    fontSize = 28.sp,
+                    fontWeight = FontWeight.Medium,
+                )
+            }
+        } else {
+            FullscreenVideoPlayer(
+                videoUrl = videoUrl,
+                videoTitle = videoTitle.ifBlank { "学习视频" },
+                startPositionMs = 0L,
+                autoPlay = true,
+                onExit = onExit,
+                onPlaybackStateChanged = { isPlaying ->
+                    playing = isPlaying
+                    onPlaybackStateChanged(isPlaying)
+                },
+                modifier = videoPlayerModifier,
+                showTopBar = false,
+                isFullscreen = videoFullscreen,
+                onFullscreenToggle = { videoFullscreen = !videoFullscreen },
+                onBackRequest = if (videoFullscreen) {
+                    { videoFullscreen = false }
+                } else {
+                    null
+                },
+            )
+        }
 
         if (!videoFullscreen) {
             Box(
@@ -464,7 +481,6 @@ private fun LearningVideoPlayer(
             }
             LearningStatusPanel(
                 studyDurationMs = displayedStudyDurationMs,
-                playing = playing,
                 captureCount = captureCount,
                 cameraReady = cameraReady,
                 modifier = Modifier
@@ -482,7 +498,7 @@ private fun LearningVideoPlayer(
                 modifier = Modifier
                     .align(Alignment.TopEnd)
                     .padding(
-                        top = if (videoFullscreen) 18.dp else 112.dp,
+                        top = if (videoFullscreen) 9.dp else 112.dp,
                         end = if (videoFullscreen) 18.dp else 38.dp,
                     ),
             )
@@ -507,17 +523,12 @@ private fun LearningVideoHeader(
             Text(
                 text = title,
                 color = PARTY_HEADER_TITLE,
-                fontSize = 23.sp,
+                fontSize = 16.sp,
                 fontWeight = FontWeight.Bold,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Text(
-                text = "党员教育  ·  学习时长同步记录",
-                color = PARTY_GOLD_LIGHT.copy(alpha = 0.86f),
-                fontSize = 12.sp,
-                maxLines = 1,
-            )
+
         }
     }
 }
@@ -644,7 +655,6 @@ private fun LearningCaptureNotice(
 @Composable
 private fun LearningStatusPanel(
     studyDurationMs: Long,
-    playing: Boolean,
     captureCount: Int,
     cameraReady: Boolean,
     modifier: Modifier = Modifier,
@@ -653,12 +663,12 @@ private fun LearningStatusPanel(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(106.dp)
+            .height(84.dp)
             .shadow(7.dp, shape)
             .clip(shape)
             .background(Color(0xF9FFFDFC))
             .border(1.dp, PARTY_RED_BORDER, shape)
-            .padding(horizontal = 12.dp, vertical = 10.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Box(
@@ -685,48 +695,17 @@ private fun LearningStatusPanel(
                 fontWeight = FontWeight.Bold,
             )
         }
-        Box(
-            modifier = Modifier
-                .fillMaxHeight()
-                .padding(vertical = 8.dp)
-                .width(1.dp)
-                .background(PARTY_RED_BORDER),
-        )
-        Spacer(Modifier.width(18.dp))
-        Column(
+        Spacer(Modifier.width(7.dp))
+        Text(
+            text = "系统每10秒进行一次学习情况的抓拍，请保持正常学习状态",
             modifier = Modifier.weight(1f),
-            verticalArrangement = Arrangement.Center,
-        ) {
-            Text(
-                text = if (playing) "正在累计有效学习时间" else "视频已暂停，学习计时同步暂停",
-                color = PARTY_TEXT_DARK,
-                fontSize = 15.sp,
-                fontWeight = FontWeight.Bold,
-            )
-            Spacer(Modifier.height(8.dp))
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(6.dp)
-                    .clip(RoundedCornerShape(4.dp))
-                    .background(PARTY_RED_SOFT),
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth(if (playing) 1f else 0.22f)
-                        .height(6.dp)
-                        .background(
-                            Brush.horizontalGradient(listOf(PARTY_RED, PARTY_RED_LIGHT)),
-                        ),
-                )
-            }
-            Spacer(Modifier.height(5.dp))
-            Text(
-                text = "仅统计视频实际播放时长",
-                color = PARTY_TEXT_MUTED,
-                fontSize = 11.sp,
-            )
-        }
+            color = PARTY_TEXT_MUTED,
+            fontSize = 14.sp,
+            lineHeight = 18.sp,
+            fontWeight = FontWeight.Medium,
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis,
+        )
         Spacer(Modifier.width(16.dp))
         Row(
             modifier = Modifier
@@ -755,7 +734,7 @@ private fun LearningStatusPanel(
             Spacer(Modifier.width(11.dp))
             Column {
                 Text(
-                    text = "本次学习凭证",
+                    text = "学习凭证",
                     color = Color.White,
                     fontSize = 15.sp,
                     fontWeight = FontWeight.Bold,
@@ -967,3 +946,26 @@ private val PARTY_GOLD_LIGHT = Color(0xFFFFE5A0)
 private val PARTY_HEADER_TITLE = Color(0xFFFFF3D0)
 private val PARTY_TEXT_DARK = Color(0xFF3A1518)
 private val PARTY_TEXT_MUTED = Color(0xFF7B5A5D)
+
+@Preview(
+    name = "学习视频页面",
+    widthDp = 960,
+    heightDp = 540,
+    showBackground = true,
+    backgroundColor = 0xFF5F050C,
+)
+@Composable
+private fun LearningVideoActivityPreview() {
+    MaterialTheme {
+        LearningVideoPlayer(
+            videoUrl = "",
+            videoTitle = "党员教育示例课程",
+            cameraReady = false,
+            cameraStatusText = "正在连接摄像头",
+            captureCount = 2,
+            onPlaybackStateChanged = {},
+            onSnapshotDue = {},
+            onExit = { _, _ -> },
+        )
+    }
+}

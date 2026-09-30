@@ -5,6 +5,7 @@ data class XyxfArticle(
     val id: String,
     val title: String,
     val publishedAt: String,
+    val imageUrl: String? = null,
 )
 
 data class XyxfArticleFeed(

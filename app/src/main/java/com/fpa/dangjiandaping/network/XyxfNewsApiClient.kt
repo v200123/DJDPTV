@@ -1,10 +1,15 @@
 package com.fpa.dangjiandaping.network
 
+import android.net.Uri
+import android.util.Log
+import com.fpa.dangjiandaping.BuildConfig
 import com.fpa.dangjiandaping.network.model.XyxfArticle
 import com.fpa.dangjiandaping.network.model.XyxfArticleFeed
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import okhttp3.OkHttpClient
 import okhttp3.ResponseBody
+import okhttp3.logging.HttpLoggingInterceptor
 import org.json.JSONArray
 import org.json.JSONObject
 import retrofit2.Response
@@ -65,6 +70,7 @@ object XyxfNewsApiClient {
         return XyxfArticle(
             id = firstNonBlank("id", "articleId") ?: title,
             title = title,
+            imageUrl = firstImageFileId()?.let { fileId -> IMAGE_BASE_URL + Uri.encode(fileId) },
             publishedAt = firstNonBlank(
                 "pubTime",
                 "publishTime",
@@ -85,6 +91,27 @@ object XyxfNewsApiClient {
         )
     }
 
+    private fun JSONObject.firstImageFileId(): String? {
+        val imageValue = opt("image")
+        val images = when (imageValue) {
+            is JSONArray -> imageValue
+            is JSONObject -> JSONArray().put(imageValue)
+            is String -> {
+                val json = imageValue.trim()
+                when {
+                    json.startsWith("[") -> runCatching { JSONArray(json) }.getOrNull()
+                    json.startsWith("{") -> runCatching { JSONArray().put(JSONObject(json)) }.getOrNull()
+                    else -> null
+                }
+            }
+            else -> null
+        } ?: return null
+
+        for (index in 0 until images.length()) {
+            images.optJSONObject(index)?.firstNonBlank("fileId")?.let { return it }
+        }
+        return null
+    }
     private fun JSONObject.firstNonBlank(vararg keys: String): String? = keys
         .asSequence()
         .map { key -> optString(key).trim() }
@@ -104,11 +131,28 @@ object XyxfNewsApiClient {
     private val api: XyxfNewsApi by lazy {
         Retrofit.Builder()
             .baseUrl(BASE_URL)
+            .client(httpClient)
             .build()
             .create(XyxfNewsApi::class.java)
     }
 
+    private val httpClient: OkHttpClient by lazy {
+        OkHttpClient.Builder()
+            .addInterceptor(
+                HttpLoggingInterceptor { message -> Log.d(LOG_TAG, message) }.apply {
+                    level = if (BuildConfig.DEBUG) {
+                        HttpLoggingInterceptor.Level.BODY
+                    } else {
+                        HttpLoggingInterceptor.Level.NONE
+                    }
+                },
+            )
+            .build()
+    }
+
     private const val BASE_URL = "https://www.xyxf.gov.cn/"
+    private const val IMAGE_BASE_URL = "https://www.scycjy.gov.cn/xyxfapi/image/"
     private const val PAGE_SIZE = 4
     private const val HTTP_SUCCESS_CODE = 200
+    private const val LOG_TAG = "XyxfNewsApi"
 }
