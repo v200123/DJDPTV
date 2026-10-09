@@ -3,6 +3,7 @@ plugins {
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
+    id("org.jetbrains.kotlin.kapt")
 }
 
 android {
@@ -12,12 +13,27 @@ android {
         applicationId = "com.fpa.dangjiandaping"
         minSdk = 23
         targetSdk = 33
-        versionCode = 205
-        versionName = "2.0.5"
+        versionCode = 207
+        versionName = "2.0.7"
+        buildConfigField(
+            "String",
+            "BIG_SCREEN_DEVICE_CODE",
+            "\"Tv-device-ganzi001\"",
+        )
+        buildConfigField(
+            "String",
+            "BIG_SCREEN_LOGIN_SECRET",
+            "\"scgbwlxyBigScreen2026\"",
+        )
     }
 
     buildTypes {
         debug {
+            buildConfigField(
+                "String",
+                "BIG_SCREEN_API_BASE_URL",
+                "\"http://192.168.99.174:7030/\"",
+            )
             buildConfigField(
                 "String",
                 "BASE_URL",
@@ -25,6 +41,11 @@ android {
             )
         }
         release {
+            buildConfigField(
+                "String",
+                "BIG_SCREEN_API_BASE_URL",
+                "\"https://www.scycjy.gov.cn/\"",
+            )
             buildConfigField(
                 "String",
                 "BASE_URL",
@@ -69,5 +90,15 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:3.0.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    implementation("androidx.camera:camera-core:1.4.2")
+    implementation("androidx.camera:camera-camera2:1.4.2")
+    implementation("androidx.camera:camera-lifecycle:1.4.2")
+    implementation("androidx.room:room-runtime:2.7.2")
+    implementation("androidx.room:room-ktx:2.7.2")
+    kapt("androidx.room:room-compiler:2.7.2")
+    implementation("androidx.webkit:webkit:1.15.0")
+    implementation("com.squareup.retrofit2:converter-kotlinx-serialization:3.0.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
+    implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.9.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

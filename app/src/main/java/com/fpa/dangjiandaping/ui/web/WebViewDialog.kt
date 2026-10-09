@@ -46,6 +46,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.compose.ui.window.DialogWindowProvider
 import androidx.tv.material3.Text
+import com.fpa.dangjiandaping.ui.login.LocalBigScreenDeviceLoginResult
 
 private const val SCALE_WIDE_PAGE_SCRIPT =
     "(function(){" +
@@ -74,6 +75,7 @@ internal fun WebViewDialog(
     val closeFocusRequester = remember { FocusRequester() }
     val handleWebViewPermissionRequest = rememberWebViewPermissionHandler()
     val webViewHolder = remember { arrayOfNulls<WebView>(1) }
+    val loginResultJson = LocalBigScreenDeviceLoginResult.current.toH5LoginResultJson()
     val requestedTitle = title?.trim()?.takeIf(String::isNotEmpty)
     var pageTitle by remember(url, requestedTitle) {
         mutableStateOf(requestedTitle ?: "网页详情")
@@ -138,7 +140,7 @@ internal fun WebViewDialog(
                     factory = { context ->
                         val scrollStepPx =
                             (72 * context.resources.displayMetrics.density).toInt()
-                        object : WebView(context) {
+                        object : CommonWebView(context, url, loginResultJson) {
                             override fun dispatchKeyEvent(event: KeyEvent): Boolean {
                                 if (event.keyCode == KeyEvent.KEYCODE_DPAD_UP) {
                                     if (event.action == KeyEvent.ACTION_DOWN) {
@@ -225,15 +227,25 @@ internal fun WebViewDialog(
                             isVerticalScrollBarEnabled = true
                             isScrollbarFadingEnabled = false
                             scrollBarStyle = View.SCROLLBARS_INSIDE_OVERLAY
-                            tag = url
+                            addJavascriptInterface(
+                                WebFocusBridge(
+                                    webView = this,
+                                    onGetUserJson = { getUserJson() },
+                                    onRequestNativeFocus = { closeFocusRequester.requestFocus() },
+                                ),
+                                "AndroidFocusBridge",
+                            )
                             loadUrl(url)
                         }
                     },
                     update = { webView ->
-                        if (webView.tag != url) {
+                        val commonWebView = webView as? CommonWebView
+                        if (commonWebView?.requestUrl != url) {
                             pageTitle = requestedTitle ?: "网页详情"
-                            webView.tag = url
+                            commonWebView?.updateRequestUrl(url, loginResultJson)
                             webView.loadUrl(url)
+                        } else {
+                            commonWebView?.updateLoginResult(loginResultJson)
                         }
                     },
                     onRelease = { webView ->
@@ -242,6 +254,7 @@ internal fun WebViewDialog(
                         }
                         webView.stopLoading()
                         webView.loadUrl("about:blank")
+                        webView.removeJavascriptInterface("AndroidFocusBridge")
                         webView.removeAllViews()
                         webView.destroy()
                     },

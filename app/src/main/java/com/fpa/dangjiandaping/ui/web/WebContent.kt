@@ -12,7 +12,8 @@ import android.webkit.JavascriptInterface
 import android.webkit.WebChromeClient
 import android.webkit.WebSettings
 import android.webkit.WebView
-import android.webkit.WebViewClient
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.layout.Box
@@ -32,6 +33,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.focus.FocusDirection
 import androidx.compose.ui.focus.focusProperties
 import androidx.compose.ui.graphics.Color as ComposeColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
@@ -40,7 +42,18 @@ import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import androidx.webkit.WebViewAssetLoader
+import androidx.webkit.WebViewClientCompat
 import com.fpa.dangjiandaping.BuildConfig
+import com.fpa.dangjiandaping.data.learning.LEARNING_SNAPSHOT_CACHE_DIRECTORY
+import com.fpa.dangjiandaping.data.learning.LEARNING_SNAPSHOT_WEB_PATH
+import com.fpa.dangjiandaping.data.learning.LearningSnapshotEntity
+import com.fpa.dangjiandaping.data.learning.LearningSnapshotRepository
+import com.fpa.dangjiandaping.ui.login.LocalBigScreenDeviceLoginResult
+import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.json.JSONObject
 
 private const val FOCUS_LOG_TAG = "FocusTrace"
 private const val WEB_LOG_TAG = "WebContent"
@@ -68,15 +81,34 @@ private const val CLEAR_WEB_DOM_FOCUS_SCRIPT =
         "typeof el.blur==='function'){el.blur();}" +
         "return true;})();"
 
-private class WebFocusBridge(
+internal class WebFocusBridge(
     private val webView: WebView,
-    private val onRequestNativeFocus: () -> Unit,
-    private val onShowNewsDetail: (String) -> Unit,
-    private val onShowServiceTeam: (String) -> Unit,
-    private val onShowPublicHelpRequest: (String) -> Unit,
-    private val onPlayVideo: (String,String) -> Unit,
-    private val onShowWebViewUrl: (String, String?) -> Unit,
+    private val onGetUserJson: () -> String? = { null },
+    private val onRequestNativeFocus: () -> Unit = {},
+    private val onShowNewsDetail: (String) -> Unit = {},
+    private val onShowServiceTeam: (String) -> Unit = {},
+    private val onShowPublicHelpRequest: (String) -> Unit = {},
+    private val onPlayVideo: (String, String) -> Unit = { _, _ -> },
+    private val onPlayLearningVideo: (
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+        String,
+    ) -> Unit = { _, _, _, _, _, _, _, _, _ -> },
+    private val onGetLastLearningVideoResultJson: () -> String? = { null },
+    private val onGetLearningSnapshotsJson: (String) -> String = { "[]" },
+    private val onGetLearningCoursesJson: (String) -> String = { "[]" },
+    private val onShowCourseImages: (String) -> Unit = {},
+    private val onShowWebViewUrl: (String, String?) -> Unit = { _, _ -> },
 ) {
+    @JavascriptInterface
+    fun getUserJson(): String? = onGetUserJson()
+
     @JavascriptInterface
     fun requestPreviousTabFocus() {
         Log.d(
@@ -145,6 +177,96 @@ private class WebFocusBridge(
         }
     }
 
+    /**
+     * Opens the native learning-video player. It records actual playback time and, while
+     * playing, takes a camera snapshot every ten seconds. H5 can pull the final summary with
+     * [getLastLearningVideoResultJson] after the player has closed.
+     */
+    @JavascriptInterface
+    fun playLearningVideo(requestJson: String?) {
+        val request = runCatching {
+            JSONObject(requestJson?.trim().orEmpty()) }
+            .getOrElse { error ->
+                Log.e(WEB_LOG_TAG, "Invalid playLearningVideo request", error)
+                return
+            }
+        val videoUrl = request.optString("ppVideoM3u8Url").trim()
+            .ifEmpty {
+                request.optJSONArray("ppVideoM3u8Urls")
+                    ?.optJSONObject(0)
+                    ?.optString("url")
+                    ?.trim()
+                    .orEmpty()
+            }
+            .ifEmpty { request.optString("videoUrl").trim() }
+        val title = request.optString("name").trim()
+            .ifEmpty { request.optString("title").trim() }
+        val classId = request.optString("classId").trim()
+            .ifEmpty { request.optString("resourceClassId").trim() }
+        val resourceId = request.optString("id").trim()
+        val speaker = request.optString("speaker").trim()
+        val startTime = request.optString("startTime").trim()
+        val endTime = request.optString("endTime").trim()
+        val resourceType = "course"
+        val resourceTypeName = "课程"
+        Log.d(
+            WEB_LOG_TAG,
+            "H5 called playLearningVideo: $videoUrl, classId=$classId, resourceId=$resourceId",
+        )
+        webView.post {
+            onPlayLearningVideo(
+                videoUrl,
+                title,
+                classId,
+                resourceId,
+                resourceType,
+                resourceTypeName,
+                speaker,
+                startTime,
+                endTime,
+            )
+        }
+    }
+
+    @JavascriptInterface
+    fun getLastLearningVideoResultJson(): String? = onGetLastLearningVideoResultJson()
+
+    /** Returns the locally stored camera-photo metadata for a class, newest first. */
+    @JavascriptInterface
+    fun getLearningSnapshotsJson(classId: String?): String =
+        onGetLearningSnapshotsJson(classId?.trim().orEmpty())
+
+    /** Returns locally collected course summaries for a training class. */
+    @JavascriptInterface
+    fun getLearningCoursesJson(classId: String?): String =
+        onGetLearningCoursesJson(classId?.trim().orEmpty())
+
+    /** Opens the native learning-evidence dialog for one course resource. */
+    @JavascriptInterface
+    fun showCourseImages(id: String?) {
+        val resourceId = id?.trim().orEmpty()
+        Log.e(
+            WEB_LOG_TAG,
+            "H5 showCourseImages 入参：rawId=[$id], " +
+                "resourceId=[$resourceId], length=${resourceId.length}",
+        )
+        if (
+            resourceId.isEmpty() ||
+            resourceId.equals("undefined", ignoreCase = true) ||
+            resourceId.equals("null", ignoreCase = true)
+        ) {
+            Log.e(WEB_LOG_TAG, "H5 showCourseImages 收到非法课程 ID，已取消查询")
+            return
+        }
+        Log.d(WEB_LOG_TAG, "H5 called showCourseImages: resourceId=$resourceId")
+        webView.post {
+            webView.evaluateJavascript(CAPTURE_WEB_FOCUS_SCRIPT) {
+                webView.clearFocus()
+                onShowCourseImages(resourceId)
+            }
+        }
+    }
+
     @JavascriptInterface
     fun showWebViewUrl(url: String) {
         showWebViewUrl(url, null)
@@ -172,6 +294,8 @@ internal fun WebContent(
     onShowPublicHelpRequest: (PublicHelpRequest) -> Unit,
     modifier: Modifier = Modifier
 ) {
+    val loginResultJson = LocalBigScreenDeviceLoginResult.current.toH5LoginResultJson()
+    val appContext = LocalContext.current.applicationContext
 //    if (LocalInspectionMode.current) {
 //        WebContentPlaceholder(
 //            message = "网页内容预览区",
@@ -184,12 +308,34 @@ internal fun WebContent(
     var loadingUrl by remember { mutableStateOf<String?>(url) }
     var newsDetail by remember(url) { mutableStateOf<NewsDetail?>(null) }
     var serviceTeam by remember(url) { mutableStateOf<ServiceTeam?>(null) }
+    var courseImagesResourceId by remember(url) { mutableStateOf<String?>(null) }
+    var courseImagesSnapshots by remember(url) {
+        mutableStateOf<List<LearningSnapshotEntity>?>(null)
+    }
     var webViewDialogRequest by remember(url) { mutableStateOf<WebViewDialogRequest?>(null) }
     var restoreNewsDetailFocus by remember(url) { mutableStateOf(false) }
     var restoreServiceTeamFocus by remember(url) { mutableStateOf(false) }
+    var restoreCourseImagesFocus by remember(url) { mutableStateOf(false) }
     var restoreWebViewDialogFocus by remember(url) { mutableStateOf(false) }
     var restoreVideoFocus by remember(url) { mutableStateOf(false) }
     var videoActivityPausedHost by remember(url) { mutableStateOf(false) }
+    var lastLearningVideoResultJson by remember(url) { mutableStateOf<String?>(null) }
+    val learningVideoLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        lastLearningVideoResultJson = LearningVideoActivity.readStudyResultJson(result.data)
+    }
+    val learningSnapshotRepository = remember(appContext) {
+        LearningSnapshotRepository.get(appContext)
+    }
+
+    LaunchedEffect(courseImagesResourceId) {
+        val resourceId = courseImagesResourceId ?: return@LaunchedEffect
+        courseImagesSnapshots = null
+        courseImagesSnapshots = withContext(Dispatchers.IO) {
+            learningSnapshotRepository.snapshotsForResource(resourceId)
+        }
+    }
     val webViewHolder = remember { arrayOfNulls<WebView>(1) }
     val lifecycleOwner = LocalLifecycleOwner.current
     val handleWebViewPermissionRequest = rememberWebViewPermissionHandler()
@@ -237,6 +383,24 @@ internal fun WebContent(
                 }
             }
             restoreServiceTeamFocus = false
+        }
+    }
+
+    LaunchedEffect(courseImagesResourceId, restoreCourseImagesFocus) {
+        if (courseImagesResourceId == null && restoreCourseImagesFocus) {
+            withFrameNanos { }
+            webViewHolder[0]?.let { webView ->
+                webView.isFocusable = true
+                webView.isFocusableInTouchMode = true
+                webView.requestFocus()
+                // Keep H5's virtual selection, but do not reactivate its previous DOM control.
+                // Otherwise the next DPAD_CENTER can activate a stale link and navigate/reload.
+                webView.evaluateJavascript(CLEAR_WEB_DOM_FOCUS_SCRIPT) { cleared ->
+                    Log.d(FOCUS_LOG_TAG, "Course images dialog dismissed -> DOM active element cleared=$cleared")
+                }
+                Log.d(FOCUS_LOG_TAG, "Course images dialog dismissed -> native WebView focus restored")
+            }
+            restoreCourseImagesFocus = false
         }
     }
 
@@ -301,11 +465,24 @@ internal fun WebContent(
             AndroidView(
                 modifier = Modifier.fillMaxSize(),
                 factory = { context ->
+                    val learningSnapshotDirectory = File(
+                        context.cacheDir,
+                        LEARNING_SNAPSHOT_CACHE_DIRECTORY,
+                    ).apply { mkdirs() }
+                    val learningSnapshotAssetLoader = WebViewAssetLoader.Builder()
+                        .addPathHandler(
+                            LEARNING_SNAPSHOT_WEB_PATH,
+                            WebViewAssetLoader.InternalStoragePathHandler(
+                                context,
+                                learningSnapshotDirectory,
+                            ),
+                        )
+                        .build()
 //                    if (BuildConfig.DEBUG) {
 //                        WebView.setWebContentsDebuggingEnabled(true)
 //                        Log.i(WEB_LOG_TAG, "WebView remote debugging enabled")
 //                    }
-                    WebView(context).apply {
+                    CommonWebView(context, url, loginResultJson).apply {
                         val scrollStepPx = (72 * resources.displayMetrics.density).toInt()
 
                         webViewHolder[0] = this
@@ -338,6 +515,7 @@ internal fun WebContent(
                         addJavascriptInterface(
                             WebFocusBridge(
                                 webView = this,
+                                onGetUserJson = { getUserJson() },
                                 onRequestNativeFocus = onRequestNativeFocus,
                                 onShowNewsDetail = { newsJson ->
                                     runCatching { parseNewsDetail(newsJson) }
@@ -380,6 +558,50 @@ internal fun WebContent(
                                             )
                                         )
                                     }
+                                },
+                                onPlayLearningVideo = {
+                                        requestedUrl,
+                                        title,
+                                        classId,
+                                        resourceId,
+                                        resourceType,
+                                        resourceTypeName,
+                                        speaker,
+                                        startTime,
+                                        endTime,
+                                    ->
+                                    if (requestedUrl.isNotEmpty()) {
+                                        restoreVideoFocus = true
+                                        videoActivityPausedHost = false
+                                        learningVideoLauncher.launch(
+                                            LearningVideoActivity.newIntent(
+                                                context = context,
+                                                videoUrl = requestedUrl,
+                                                videoTitle = title,
+                                                classId = classId,
+                                                resourceId = resourceId,
+                                                resourceType = resourceType,
+                                                resourceTypeName = resourceTypeName,
+                                                speaker = speaker,
+                                                startTime = startTime,
+                                                endTime = endTime,
+                                            ),
+                                        )
+                                    }
+                                },
+                                onGetLastLearningVideoResultJson = {
+                                    lastLearningVideoResultJson
+                                },
+                                onGetLearningSnapshotsJson = { classId ->
+                                    val snapshotsJsonForClass =
+                                        learningSnapshotRepository.snapshotsJsonForClass(classId)
+                                    snapshotsJsonForClass
+                                },
+                                onGetLearningCoursesJson = { classId ->
+                                    learningSnapshotRepository.learningCoursesJsonForClass(classId)
+                                },
+                                onShowCourseImages = { resourceId ->
+                                    courseImagesResourceId = resourceId
                                 },
                                 onShowWebViewUrl = { requestedUrl, requestedTitle ->
                                     if (requestedUrl.isNotEmpty()) {
@@ -424,7 +646,23 @@ internal fun WebContent(
                                 }
                             }
                         }
-                        webViewClient = object : WebViewClient() {
+                        webViewClient = object : WebViewClientCompat() {
+                            override fun shouldInterceptRequest(
+                                view: WebView,
+                                request: android.webkit.WebResourceRequest,
+                            ): android.webkit.WebResourceResponse? =
+                                learningSnapshotAssetLoader.shouldInterceptRequest(request.url)
+                                    ?: super.shouldInterceptRequest(view, request)
+
+                            @Suppress("DEPRECATION")
+                            override fun shouldInterceptRequest(
+                                view: WebView,
+                                url: String,
+                            ): android.webkit.WebResourceResponse? =
+                                learningSnapshotAssetLoader.shouldInterceptRequest(
+                                    android.net.Uri.parse(url),
+                                ) ?: super.shouldInterceptRequest(view, url)
+
                             override fun onPageStarted(
                                 view: WebView,
                                 url: String?,
@@ -432,11 +670,11 @@ internal fun WebContent(
                             ) {
                                 super.onPageStarted(view, url, favicon)
                                 Log.i(WEB_LOG_TAG, "onPageStarted: $url")
-                                loadingUrl = view.tag as? String ?: url
+                                loadingUrl = (view as? CommonWebView)?.requestUrl ?: url
                                 onPageReadyChanged(view, false)
                             }
 
-                            override fun onPageCommitVisible(view: WebView, url: String?) {
+                            override fun onPageCommitVisible(view: WebView, url: String) {
                                 super.onPageCommitVisible(view, url)
                                 Log.i(WEB_LOG_TAG, "onPageCommitVisible: $url")
                                 loadingUrl = null
@@ -512,11 +750,12 @@ internal fun WebContent(
                     if (!webViewInteractive && view.hasFocus()) {
                         view.clearFocus()
                     }
-                    if (view.tag != url) {
-                        Log.i(WEB_LOG_TAG, "loadUrl(routeChanged): ${view.tag} -> $url")
+                    val commonWebView = view as? CommonWebView
+                    if (commonWebView?.requestUrl != url) {
+                        Log.i(WEB_LOG_TAG, "loadUrl(routeChanged): ${commonWebView?.requestUrl} -> $url")
                         view.stopLoading()
                         view.clearHistory()
-                        view.tag = url
+                        commonWebView?.updateRequestUrl(url, loginResultJson)
                         loadingUrl = url
                         onCanGoBackChanged(false)
                         view.loadUrl(url)
@@ -524,6 +763,8 @@ internal fun WebContent(
                         Log.i(WEB_LOG_TAG, "loadUrl(emptyWebView): $url")
                         loadingUrl = url
                         view.loadUrl(url)
+                    } else {
+                        commonWebView?.updateLoginResult(loginResultJson)
                     }
                 },
                 onRelease = { view ->
@@ -565,6 +806,18 @@ internal fun WebContent(
                 onDismiss = {
                     serviceTeam = null
                     restoreServiceTeamFocus = true
+                },
+            )
+        }
+
+        courseImagesResourceId?.let { resourceId ->
+            CourseImagesDialog(
+                resourceId = resourceId,
+                snapshots = courseImagesSnapshots,
+                onDismiss = {
+                    courseImagesResourceId = null
+                    courseImagesSnapshots = null
+                    restoreCourseImagesFocus = true
                 },
             )
         }
