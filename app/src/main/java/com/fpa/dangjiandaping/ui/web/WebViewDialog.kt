@@ -2,6 +2,7 @@ package com.fpa.dangjiandaping.ui.web
 
 import android.annotation.SuppressLint
 import android.graphics.Color
+import android.net.Uri
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
@@ -43,6 +44,11 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.input.key.Key
+import androidx.compose.ui.input.key.KeyEventType
+import androidx.compose.ui.input.key.key
+import androidx.compose.ui.input.key.onPreviewKeyEvent
+import androidx.compose.ui.input.key.type
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -68,6 +74,69 @@ private const val SCALE_WIDE_PAGE_SCRIPT =
         "root.style.zoom=overflow?'0.7':'';" +
         "return overflow;" +
         "})();"
+
+private fun isXyxfHostUrl(url: String?): Boolean {
+    if (url.isNullOrBlank()) return false
+    val uri = Uri.parse(url)
+    return uri.scheme == "https" &&
+        uri.host.equals("www.xyxf.gov.cn", ignoreCase = true)
+}
+
+private fun isXyxfDetailsUrl(url: String?): Boolean {
+    if (!isXyxfHostUrl(url)) return false
+    val fragment = Uri.parse(url).fragment ?: return false
+    return fragment == "/index/details" || fragment.startsWith("/index/details?")
+}
+
+private const val INSTALL_XYXF_TV_SCROLL_SCRIPT = """
+    (function() {
+        if (window.__xyxfTvKeyHandler) {
+            window.removeEventListener('keydown', window.__xyxfTvKeyHandler, true);
+        }
+        window.__xyxfTvKeyHandler = function(event) {
+            if (location.hostname.toLowerCase() !== 'www.xyxf.gov.cn' ||
+                !/^#\/index\/details(?:\?|$)/.test(location.hash) ||
+                (event.key !== 'ArrowUp' && event.key !== 'ArrowDown')) return;
+            if (event.target && event.target.closest &&
+                event.target.closest('input, textarea, [contenteditable="true"]')) return;
+
+            event.preventDefault();
+            event.stopImmediatePropagation();
+            var direction = event.key === 'ArrowDown' ? 1 : -1;
+            var root = document.scrollingElement || document.documentElement;
+            function canScroll(element) {
+                if (!element || element.clientHeight <= 0 ||
+                    element.scrollHeight <= element.clientHeight + 2) return false;
+                if (element === root) return true;
+                var style = window.getComputedStyle(element);
+                return (/auto|scroll|overlay/.test(style.overflowY) || element.scrollTop > 0) &&
+                    style.visibility !== 'hidden' && style.display !== 'none';
+            }
+            function move(element) {
+                if (!canScroll(element)) return false;
+                var before = element.scrollTop;
+                element.scrollTop = before + direction * 72;
+                return Math.abs(element.scrollTop - before) > 0.5;
+            }
+            var article = document.getElementById('app');
+            if (canScroll(article)) {
+                if (move(article) || move(root)) return;
+            } else {
+                var hit = document.elementFromPoint(window.innerWidth / 2, window.innerHeight / 2);
+                while (hit && hit !== root) {
+                    if (move(hit)) return;
+                    hit = hit.parentElement;
+                }
+                if (move(root)) return;
+            }
+            if (direction < 0 && window.AndroidFocusBridge &&
+                window.AndroidFocusBridge.requestPreviousTabFocus) {
+                window.AndroidFocusBridge.requestPreviousTabFocus();
+            }
+        };
+        window.addEventListener('keydown', window.__xyxfTvKeyHandler, true);
+    })();
+"""
 
 /**
  * WebView 弹窗。
@@ -136,6 +205,17 @@ internal fun WebViewDialog(
                     TvDialogCloseButton(
                         onClick = onDismiss,
                         focusRequester = closeFocusRequester,
+                        modifier = Modifier.onPreviewKeyEvent { event ->
+                            if (event.type != KeyEventType.KeyDown ||
+                                event.key != Key.DirectionDown
+                            ) {
+                                false
+                            } else {
+                                webViewHolder[0]
+                                    ?.takeIf { isXyxfDetailsUrl(it.url ?: url) }
+                                    ?.requestFocus() == true
+                            }
+                        },
                     )
                 }
                 Spacer(Modifier.height(8.dp))
@@ -174,7 +254,10 @@ internal fun WebViewDialog(
                                         KeyEvent.KEYCODE_DPAD_DOWN -> 1
                                         else -> 0
                                     }
-                                    if (direction != 0 && view.canScrollVertically(direction)) {
+                                    if (direction == 0 || isXyxfDetailsUrl((view as WebView).url ?: url)) {
+                                        // This page receives DPAD in the DOM; its #app container owns scrolling.
+                                        false
+                                    } else if (view.canScrollVertically(direction)) {
                                         val scrollStepPx = (72 * resources.displayMetrics.density).toInt()
                                             .coerceAtLeast(1)
                                         view.scrollBy(0, direction * scrollStepPx)
@@ -204,6 +287,9 @@ internal fun WebViewDialog(
                                 override fun onPageFinished(view: WebView, url: String?) {
                                     super.onPageFinished(view, url)
                                     isPageLoading = false
+                                    if (isXyxfHostUrl(view.url ?: url)) {
+                                        view.evaluateJavascript(INSTALL_XYXF_TV_SCROLL_SCRIPT, null)
+                                    }
                                     // Some pages finish laying out shortly after onPageFinished.
                                     view.postDelayed(
                                         {
@@ -233,6 +319,9 @@ internal fun WebViewDialog(
                                 WebFocusBridge(
                                     webView = this,
                                     onGetUserJson = { getUserJson() },
+                                    onRequestNativeFocus = {
+                                        closeFocusRequester.requestFocus()
+                                    },
                                 ),
                                 "AndroidFocusBridge",
                             )

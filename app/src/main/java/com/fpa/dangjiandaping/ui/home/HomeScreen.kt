@@ -805,7 +805,7 @@ private fun VideoControlBar(
     Row(
         modifier = modifier
             .fillMaxWidth()
-            .height(46.dp)
+            .height(32.dp)
             .background(
                 Brush.verticalGradient(listOf(Color(0x22000000), Color(0xE5101017))),
             )

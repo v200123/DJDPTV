@@ -480,7 +480,7 @@ private fun HelpRequestLeftColumn(
         modifier = modifier
             .clip(shape)
             .border(
-                width = if (focused) 2.dp else 0.dp,
+                width = if (focused) 2.dp else 1.dp,
                 color = HelpDialogGold,
                 shape = shape,
             )
@@ -523,7 +523,7 @@ private fun HelpRequestLeftColumn(
             .focusable()
             .clipToBounds()
             .verticalScroll(scrollState)
-            .padding(horizontal = 8.dp, vertical = 6.dp),
+            .padding(horizontal = 8.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         HelpSectionTitle("群众位置")

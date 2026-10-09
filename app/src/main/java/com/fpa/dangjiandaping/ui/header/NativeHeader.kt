@@ -108,12 +108,16 @@ private fun HeaderBrandRow(
         modifier = modifier,
         contentAlignment = Alignment.TopEnd
     ) {
-        Image(painterResource(R.drawable.ic_app_left_logo), contentScale = ContentScale.Fit, contentDescription = "",
-            modifier = Modifier.align(Alignment.TopStart))
-        Column(horizontalAlignment = Alignment.End, modifier = Modifier.offset(y = 10.dp)) {
+        Column(horizontalAlignment = Alignment.End, modifier = Modifier.offset(y=10.dp)) {
             Text("中共甘孜州委组织部", color = Color(0xFFFFD186), fontSize = 12.sp)
             Text(currentDateText(), color = Color(0xFFFFD186), fontSize = 10.sp)
         }
+        Image(
+            painterResource(R.drawable.ic_app_left_logo),
+            contentScale = ContentScale.FillWidth,
+            contentDescription = "",
+            modifier = Modifier.align(Alignment.TopStart).height(54.dp)
+        )
     }
 }
 
@@ -172,10 +176,11 @@ private fun HeaderTabRow(
                         if (focusState.isFocused) {
                             onTabFocused(index)
                             Log.d(FOCUS_LOG_TAG, "NativeTab[$index][${tab.title}] FOCUSED")
-                        } }
+                        }
+                    }
                     .onPreviewKeyEvent { event ->
                         val moveToContent = event.type == KeyEventType.KeyDown &&
-                            event.key == Key.DirectionDown
+                                event.key == Key.DirectionDown
                         // Confirmation keys select the tab via selectable.onClick, but keep
                         // focus in the tab row. Only DPAD_DOWN enters the content area.
                         if (moveToContent) {
@@ -309,24 +314,27 @@ private fun StableTabLabel(
                 textAlign = TextAlign.Center,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.graphicsLayer {
-                    val scale = if (emphasized) 22f / 16f else 1f
-                    scaleX = scale
-                    scaleY = scale
-                    transformOrigin = when {
-                        isFirst -> TransformOrigin(0f, 0.5f)
-                        isLast -> TransformOrigin(1f, 0.5f)
-                        else -> TransformOrigin.Center
+                modifier = Modifier
+                    .graphicsLayer {
+                        val scale = if (emphasized) 22f / 16f else 1f
+                        scaleX = scale
+                        scaleY = scale
+                        transformOrigin = when {
+                            isFirst -> TransformOrigin(0f, 0.5f)
+                            isLast -> TransformOrigin(1f, 0.5f)
+                            else -> TransformOrigin.Center
+                        }
+                        clip = false
                     }
-                    clip = false
-                }
                     .then(
                         if (focused) {
-                            Modifier.border(
-                                width = 2.dp,
-                                color = Color(0xFFFFD186),
-                                shape = RoundedCornerShape(5.dp),
-                            ).padding(horizontal = 5.dp, vertical = 2.dp)
+                            Modifier
+                                .border(
+                                    width = 2.dp,
+                                    color = Color(0xFFFFD186),
+                                    shape = RoundedCornerShape(5.dp),
+                                )
+                                .padding(horizontal = 5.dp, vertical = 2.dp)
                         } else {
                             Modifier
                         },
