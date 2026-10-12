@@ -1,6 +1,6 @@
 # DJDPTV
 
-Android TV 党建大屏客户端，应用包名为 `com.fpa.dangjiandaping`。
+Android TV 党建大屏客户端，提供可同时安装的 standard 和 meishan 两种变体。
 
 ## 页面结构
 
@@ -14,13 +14,17 @@ Android TV 党建大屏客户端，应用包名为 `com.fpa.dangjiandaping`。
 
 ## 构建
 
-使用 JDK 17：
+使用 JDK 17 分别构建两种 Debug APK：
 
 ```powershell
-.\gradlew.bat :app:assembleDebug
+.\gradlew.bat :app:assembleStandardDebug
+.\gradlew.bat :app:assembleMeishanDebug
 ```
 
-APK 输出路径：`app/build/outputs/apk/debug/app-debug.apk`。
+- standard：`com.fpa.dangjiandaping`，输出到 `app/build/outputs/apk/standard/debug/app-standard-debug.apk`。
+- meishan：`com.fpa.dangjiandaping.meishan`，输出到 `app/build/outputs/apk/meishan/debug/app-meishan-debug.apk`。
+
+两种变体使用同一份源码和桌面名称。
 
 电视/模拟器必须与 `192.168.20.233` 位于可互通的局域网；该地址不可达时，
 原生头部仍会显示，但 WebView 内容区无法加载网页。

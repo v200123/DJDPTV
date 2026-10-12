@@ -1,8 +1,5 @@
 package com.fpa.dangjiandaping.ui.screen
 
-import android.app.Activity
-import android.content.Context
-import android.content.ContextWrapper
 import android.media.AudioManager
 import android.media.ToneGenerator
 import android.view.SoundEffectConstants
@@ -109,7 +106,6 @@ fun DangJianTvScreen(
     val contentFocusRequester = remember { FocusRequester() }
     val rootView = LocalView.current
     val context = LocalContext.current
-    val activity = remember(context) { context.findActivity() }
     val isInPreview = LocalInspectionMode.current
 
     fun replaceRoute(route: TvRoute) {
@@ -204,7 +200,7 @@ fun DangJianTvScreen(
                 tabFocusRequesters[HOME_TAB_INDEX].requestFocus()
             }
 
-            else -> activity?.finish()
+            else -> Unit // Already on Home: consume Back without closing the app.
         }
     }
 
@@ -427,12 +423,6 @@ private suspend fun playPublicHelpAlertTone() {
     } finally {
         toneGenerator.release()
     }
-}
-
-private tailrec fun Context.findActivity(): Activity? = when (this) {
-    is Activity -> this
-    is ContextWrapper -> baseContext.findActivity()
-    else -> null
 }
 
 @Preview(

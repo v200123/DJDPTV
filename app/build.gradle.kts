@@ -27,6 +27,17 @@ android {
         )
     }
 
+    flavorDimensions += "edition"
+    productFlavors {
+        create("standard") {
+            dimension = "edition"
+        }
+        create("meishan") {
+            dimension = "edition"
+            applicationIdSuffix = ".meishan"
+        }
+    }
+
     buildTypes {
         debug {
             buildConfigField(
