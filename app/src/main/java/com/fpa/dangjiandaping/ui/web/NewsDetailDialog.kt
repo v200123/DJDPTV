@@ -470,7 +470,7 @@ private fun NewsHtmlContent(
     }
 
     val textColor = HelpDialogWarmWhite.toArgb()
-    val backgroundColor = HelpDialogCardRed.toArgb()
+    val backgroundColor = HelpDialogCardRed.copy(alpha = 1f).toArgb()
     AndroidView(
         modifier = modifier,
         factory = { context ->
@@ -479,6 +479,9 @@ private fun NewsHtmlContent(
 
                 setTextColor(textColor)
                 setBackgroundColor(backgroundColor)
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    defaultFocusHighlightEnabled = false
+                }
                 textSize = 18f
                 setLineSpacing(8f, 1.25f)
                 setPadding(24, 18, 24, 24)

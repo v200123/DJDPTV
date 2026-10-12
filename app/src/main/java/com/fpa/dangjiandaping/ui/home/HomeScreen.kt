@@ -14,7 +14,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusGroup
 import androidx.compose.foundation.focusable
-import androidx.compose.foundation.gestures.detectTapGestures
+
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -35,7 +35,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
+
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
@@ -305,7 +305,6 @@ internal fun HomeScreen(
                 )
                 PartyWorkPanel(
                     videoControlFocusRequester = videoControlFocusRequester,
-                    topFocusRequester = contentFocusRequester,
                     firstItemFocusRequester = firstPartyBuildingFocusRequester,
                     lowerItemFocusRequester = lowerPartyBuildingFocusRequester,
                     tabFocusRequester = partyWorkTabFocusRequester,
@@ -682,8 +681,6 @@ private fun RuntimeVideoPlayer(
         }
         previousPlaybackAllowed = playbackAllowed
     }
-    var dragging by remember { mutableStateOf(false) }
-    var dragFraction by remember { mutableFloatStateOf(0f) }
 
     Box(Modifier.fillMaxSize()) {
         GSYPlayerSurface(controller, Modifier.matchParentSize())
@@ -715,20 +712,9 @@ private fun RuntimeVideoPlayer(
 
         VideoControlBar(
             isPlaying = snapshot.isPlaying,
-            currentPosition = snapshot.currentPosition,
-            duration = snapshot.duration,
-            bufferPercent = snapshot.bufferPercent,
-            dragging = dragging,
-            dragFraction = dragFraction,
+
             onTogglePlay = controller::togglePlayPause,
-            onDragChanged = { fraction ->
-                dragging = true
-                dragFraction = fraction
-            },
-            onDragFinished = { fraction ->
-                controller.seekTo((snapshot.duration * fraction).toLong())
-                dragging = false
-            },
+
             onFullscreen = {
                 onFullscreen(
                     snapshot.currentPosition,
@@ -759,14 +745,9 @@ private fun StaticVideoControls(modifier: Modifier = Modifier) {
     Box(Modifier.fillMaxSize()) {
         VideoControlBar(
             isPlaying = false,
-            currentPosition = 74_000L,
-            duration = 240_000L,
-            bufferPercent = 64,
-            dragging = false,
-            dragFraction = 0f,
+
             onTogglePlay = {},
-            onDragChanged = {},
-            onDragFinished = {},
+
             onFullscreen = {},
             modifier = modifier,
         )
@@ -781,14 +762,7 @@ private fun StaticVideoControls(modifier: Modifier = Modifier) {
 @Composable
 private fun VideoControlBar(
     isPlaying: Boolean,
-    currentPosition: Long,
-    duration: Long,
-    bufferPercent: Int,
-    dragging: Boolean,
-    dragFraction: Float,
     onTogglePlay: () -> Unit,
-    onDragChanged: (Float) -> Unit,
-    onDragFinished: (Float) -> Unit,
     onFullscreen: () -> Unit,
     primaryControlFocusRequester: FocusRequester? = null,
     primaryControlRightFocusRequester: FocusRequester? = null,
@@ -796,12 +770,6 @@ private fun VideoControlBar(
     fullscreenRightFocusRequester: FocusRequester? = null,
     modifier: Modifier = Modifier,
 ) {
-    val playedFraction = when {
-        dragging -> dragFraction
-        duration > 0 -> (currentPosition.toFloat() / duration).coerceIn(0f, 1f)
-        else -> 0f
-    }
-
     Row(
         modifier = modifier
             .fillMaxWidth()
@@ -811,7 +779,7 @@ private fun VideoControlBar(
             )
             .padding(horizontal = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(10.dp),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
     ) {
         VideoBarButton(
             label = if (isPlaying) "Ⅱ" else "▶",
@@ -835,24 +803,23 @@ private fun VideoControlBar(
                     }
                 ),
         )
-//        Row(verticalAlignment = Alignment.CenterVertically) {
-//            Box(Modifier.size(7.dp).background(PrimaryRed, CircleShape))
-//            Spacer(Modifier.width(5.dp))
-//            Text("直播", color = Color.White, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-//        }
-        SeekBar(
-            playedFraction = playedFraction,
-            bufferFraction = bufferPercent.coerceIn(0, 100) / 100f,
-            onDragChanged = onDragChanged,
-            onDragFinished = onDragFinished,
+        Row(
             modifier = Modifier.weight(1f),
-        )
-        Text(
-            text = "${formatDuration(currentPosition)} / ${formatDuration(duration)}",
-            color = Color.White.copy(alpha = 0.82f),
-            fontSize = 9.sp,
-        )
-//        VideoBarButton(")))", onClick = {})
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                text = "●",
+                color = PrimaryRed,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = "直播中",
+                color = Color.White,
+                fontSize = 10.sp,
+                fontWeight = FontWeight.Bold,
+            )
+        }
         VideoBarButton(
             label = "⛶",
             onClick = onFullscreen,
@@ -876,55 +843,6 @@ private fun VideoControlBar(
                     }
                 ),
         )
-    }
-}
-
-@Composable
-private fun SeekBar(
-    playedFraction: Float,
-    bufferFraction: Float,
-    onDragChanged: (Float) -> Unit,
-    onDragFinished: (Float) -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val clickFocusRequester = remember { FocusRequester() }
-    Canvas(
-        modifier = modifier
-            .height(24.dp)
-            .focusRequester(clickFocusRequester)
-            .logFocusTarget("Home.VideoSeekBar")
-            .focusOnClick(clickFocusRequester)
-            .pointerInput(clickFocusRequester) {
-                detectTapGestures(
-                    onPress = { offset ->
-                        clickFocusRequester.requestFocus()
-                        val fraction = (offset.x / size.width).coerceIn(0f, 1f)
-                        onDragChanged(fraction)
-                        tryAwaitRelease()
-                        onDragFinished(fraction)
-                    },
-                )
-            }
-            .focusable(),
-    ) {
-        val centerY = size.height / 2f
-        val trackHeight = 3.dp.toPx()
-        drawRoundRect(
-            color = Color(0x55FFFFFF),
-            topLeft = Offset(0f, centerY - trackHeight / 2f),
-            size = Size(size.width, trackHeight),
-        )
-        drawRoundRect(
-            color = Color(0x99FFFFFF),
-            topLeft = Offset(0f, centerY - trackHeight / 2f),
-            size = Size(size.width * bufferFraction, trackHeight),
-        )
-        drawRoundRect(
-            color = PrimaryRed,
-            topLeft = Offset(0f, centerY - trackHeight / 2f),
-            size = Size(size.width * playedFraction, trackHeight),
-        )
-        drawCircle(PrimaryRed, 5.dp.toPx(), Offset(size.width * playedFraction, centerY))
     }
 }
 
@@ -1006,7 +924,6 @@ private fun FocusableAction(
 @Composable
 private fun PartyWorkPanel(
     videoControlFocusRequester: FocusRequester,
-    topFocusRequester: FocusRequester?,
     firstItemFocusRequester: FocusRequester,
     lowerItemFocusRequester: FocusRequester,
     tabFocusRequester: FocusRequester,
@@ -1071,7 +988,7 @@ private fun PartyWorkPanel(
                 category = PartyWorkCategory.WorkDynamics,
                 selected = selectedCategory == PartyWorkCategory.WorkDynamics,
                 focusRequester = tabFocusRequester,
-                upFocusRequester = topFocusRequester,
+                upFocusRequester = moreFocusRequester,
                 downFocusRequester = firstItemFocusRequester,
                 rightFocusRequester = reviewTabFocusRequester,
                 leftFocusRequester = videoControlFocusRequester,
@@ -1082,7 +999,7 @@ private fun PartyWorkPanel(
                 category = PartyWorkCategory.PioneerCommentary,
                 selected = selectedCategory == PartyWorkCategory.PioneerCommentary,
                 focusRequester = reviewTabFocusRequester,
-                upFocusRequester = topFocusRequester,
+                upFocusRequester = moreFocusRequester,
                 downFocusRequester = firstItemFocusRequester,
                 rightFocusRequester = moreFocusRequester,
                 leftFocusRequester = tabFocusRequester,
@@ -1585,11 +1502,6 @@ private fun FocusableTile(
     ) {
         content()
     }
-}
-
-private fun formatDuration(milliseconds: Long): String {
-    val seconds = (milliseconds / 1_000L).coerceAtLeast(0L)
-    return "%02d:%02d".format(seconds / 60L, seconds % 60L)
 }
 
 @Preview(

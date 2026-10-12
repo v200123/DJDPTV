@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Bundle
 import android.os.SystemClock
+import android.util.Log
 import android.view.KeyEvent
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -63,12 +64,18 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.lifecycle.LifecycleOwner
+import androidx.lifecycle.lifecycleScope
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import com.fpa.dangjiandaping.BuildConfig
+import com.fpa.dangjiandaping.data.BigScreenDeviceSessionStore
 import com.fpa.dangjiandaping.data.learning.LEARNING_SNAPSHOT_CACHE_DIRECTORY
 import com.fpa.dangjiandaping.data.learning.LearningSnapshotRepository
+import com.fpa.dangjiandaping.network.BigScreenClient
+import com.fpa.dangjiandaping.network.api.LearnTimesRequest
 import com.shuyu.gsyvideoplayer.player.PlayerFactory
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.launch
 import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.Executor
@@ -80,11 +87,11 @@ import tv.danmaku.ijk.media.exo2.Exo2PlayerManager
  * handle an incomplete verification record.
  */
 class LearningVideoActivity : ComponentActivity() {
-
     private lateinit var snapshotCamera: LearningSnapshotCamera
     private lateinit var snapshotRepository: LearningSnapshotRepository
     private val studyTracker = StudyDurationTracker()
     private var persistedStudyDurationMs = 0L
+    private var learningRecordJob: Job? = null
     private var cameraStatus by mutableStateOf(CAMERA_STATUS_PENDING_PERMISSION)
     private var capturedSnapshotCount by mutableIntStateOf(0)
 
@@ -157,6 +164,7 @@ class LearningVideoActivity : ComponentActivity() {
                             )
                         }
                     },
+                    onLearningTimeDue = { recordLearningTime(classId, resourceId) },
                     onSnapshotDue = {
                         // The Compose timer is cancelled on pause. Check the tracker again here
                         // to also cover a pause racing with the timer callback.
@@ -271,6 +279,41 @@ class LearningVideoActivity : ComponentActivity() {
         )
     }
 
+    private fun recordLearningTime(classId: String, resourceId: String) {
+        Log.i(LEARN_TIMES_LOG_TAG, "累计播放达到3分钟，准备提交学时记录。")
+        if (learningRecordJob?.isActive == true) {
+            Log.w(LEARN_TIMES_LOG_TAG, "上一条学时请求仍在处理中，跳过本次触发。")
+            return
+        }
+        val session = BigScreenDeviceSessionStore(this).validSession()
+        val accessToken = session?.accessToken
+        val userId = session?.userId
+        val organId = session?.organId
+        if (accessToken.isNullOrBlank() || userId.isNullOrBlank() || organId.isNullOrBlank()) {
+            Log.w(LEARN_TIMES_LOG_TAG, "未找到有效的大屏登录会话，跳过本次学习记录。")
+            return
+        }
+        if (classId.isBlank() || resourceId.isBlank()) {
+            Log.w(LEARN_TIMES_LOG_TAG, "课程或课件 ID 为空，跳过本次学习记录。")
+            return
+        }
+        val request = LearnTimesRequest(
+            courseId = resourceId,
+            coursewareId = resourceId,
+            userId = userId,
+            organId = organId,
+            classId = classId,
+        )
+        Log.i(LEARN_TIMES_LOG_TAG, "开始 POST learnTimes/add。")
+        learningRecordJob = lifecycleScope.launch {
+            runCatching { BigScreenClient.addLearnTime(request, accessToken) }
+                .onSuccess { Log.i(LEARN_TIMES_LOG_TAG, "学习时长记录提交成功。") }
+                .onFailure { error ->
+                    Log.e(LEARN_TIMES_LOG_TAG, "学习时长记录提交失败。", error)
+                }
+        }
+    }
+
     private fun finishWithStudyResult(
         classId: String,
         resourceId: String,
@@ -362,6 +405,7 @@ private fun LearningVideoPlayer(
     cameraStatusText: String,
     captureCount: Int,
     onPlaybackStateChanged: (Boolean) -> Unit,
+    onLearningTimeDue: () -> Unit,
     onSnapshotDue: () -> Unit,
     onExit: (Long, Boolean) -> Unit,
 ) {
@@ -370,6 +414,7 @@ private fun LearningVideoPlayer(
     var showCaptureNotice by remember { mutableStateOf(true) }
     var videoFullscreen by remember { mutableStateOf(false) }
     var nextSnapshotDueMs by remember { mutableLongStateOf(SNAPSHOT_INTERVAL_MILLIS) }
+    var nextLearningRecordDueMs by remember { mutableLongStateOf(LEARN_TIMES_INTERVAL_MILLIS) }
     var snapshotPending by remember { mutableStateOf(false) }
 
     LaunchedEffect(playing) {
@@ -378,8 +423,14 @@ private fun LearningVideoPlayer(
         while (true) {
             kotlinx.coroutines.delay(STUDY_DURATION_TICK_MILLIS)
             val now = SystemClock.elapsedRealtime()
-            displayedStudyDurationMs += (now - lastTick).coerceAtLeast(0L)
+            val tickDurationMs = (now - lastTick).coerceAtLeast(0L)
+            val updatedStudyDurationMs = displayedStudyDurationMs + tickDurationMs
+            displayedStudyDurationMs = updatedStudyDurationMs
             lastTick = now
+            if (updatedStudyDurationMs >= nextLearningRecordDueMs) {
+                onLearningTimeDue()
+                nextLearningRecordDueMs += LEARN_TIMES_INTERVAL_MILLIS
+            }
         }
     }
 
@@ -933,8 +984,9 @@ private class LearningSnapshotCamera(
 private class NoAvailableCameraException : IllegalStateException()
 
 private const val SNAPSHOT_INTERVAL_MILLIS = 10_000L
+private const val LEARN_TIMES_INTERVAL_MILLIS = 1 * 60 * 1_000L
+private const val LEARN_TIMES_LOG_TAG = "LearnTimes"
 private const val STUDY_DURATION_TICK_MILLIS = 500L
-
 private val PARTY_RED = Color(0xFFC91522)
 private val PARTY_RED_DARK = Color(0xFF8F0712)
 private val PARTY_RED_LIGHT = Color(0xFFE8463F)
@@ -964,6 +1016,7 @@ private fun LearningVideoActivityPreview() {
             cameraStatusText = "正在连接摄像头",
             captureCount = 2,
             onPlaybackStateChanged = {},
+            onLearningTimeDue = {},
             onSnapshotDue = {},
             onExit = { _, _ -> },
         )

@@ -114,9 +114,9 @@ private fun HeaderBrandRow(
         }
         Image(
             painterResource(R.drawable.ic_app_left_logo),
-            contentScale = ContentScale.FillWidth,
+            contentScale = ContentScale.FillBounds,
             contentDescription = "",
-            modifier = Modifier.align(Alignment.TopStart).height(54.dp)
+            modifier = Modifier.align(Alignment.TopStart).size(416.dp,54.dp)
         )
     }
 }

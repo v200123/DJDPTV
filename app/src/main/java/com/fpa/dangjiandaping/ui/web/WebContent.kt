@@ -81,6 +81,8 @@ private const val CLEAR_WEB_DOM_FOCUS_SCRIPT =
         "typeof el.blur==='function'){el.blur();}" +
         "return true;})();"
 
+private const val LOAD_COURSE_LIST_SCRIPT =
+    "javascript:loadCourseList()"
 internal class WebFocusBridge(
     private val webView: WebView,
     private val onGetUserJson: () -> String? = { null },
@@ -321,10 +323,12 @@ internal fun WebContent(
     var restoreVideoFocus by remember(url) { mutableStateOf(false) }
     var videoActivityPausedHost by remember(url) { mutableStateOf(false) }
     var lastLearningVideoResultJson by remember(url) { mutableStateOf<String?>(null) }
+    var refreshCourseListAfterVideo by remember(url) { mutableStateOf(false) }
     val learningVideoLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult(),
     ) { result ->
         lastLearningVideoResultJson = LearningVideoActivity.readStudyResultJson(result.data)
+        refreshCourseListAfterVideo = true
     }
     val learningSnapshotRepository = remember(appContext) {
         LearningSnapshotRepository.get(appContext)
@@ -356,6 +360,34 @@ internal fun WebContent(
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+
+
+    LaunchedEffect(
+        appInForeground,
+        refreshCourseListAfterVideo,
+        restoreVideoFocus,
+        videoActivityPausedHost,
+    ) {
+        if (
+            !appInForeground ||
+            !refreshCourseListAfterVideo ||
+            restoreVideoFocus ||
+            videoActivityPausedHost
+        ) {
+            return@LaunchedEffect
+        }
+        withFrameNanos { }
+        val webView = webViewHolder[0]
+        if (webView == null) {
+            Log.w(WEB_LOG_TAG, "学习视频已关闭，但找不到原来的 WebView，未调用 loadCourseList()。")
+            refreshCourseListAfterVideo = false
+            return@LaunchedEffect
+        }
+        webView.evaluateJavascript(LOAD_COURSE_LIST_SCRIPT) { result ->
+            Log.i(WEB_LOG_TAG, "学习视频关闭后调用 loadCourseList(): $result")
+        }
+        refreshCourseListAfterVideo = false
     }
 
     LaunchedEffect(newsDetail, restoreNewsDetailFocus) {

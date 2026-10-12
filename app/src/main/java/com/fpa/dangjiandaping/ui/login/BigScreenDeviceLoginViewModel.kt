@@ -1,6 +1,7 @@
 package com.fpa.dangjiandaping.ui.login
 
 import android.content.Context
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
@@ -61,6 +62,10 @@ class BigScreenDeviceLoginViewModel(
     private val effectChannel = Channel<BigScreenDeviceLoginEffect>(Channel.BUFFERED)
     private var loginJob: Job? = null
 
+    private companion object {
+        const val LOG_TAG = "BigScreenLogin"
+    }
+
     val state: StateFlow<BigScreenDeviceLoginState> = mutableState.asStateFlow()
     val effects = effectChannel.receiveAsFlow()
 
@@ -75,8 +80,12 @@ class BigScreenDeviceLoginViewModel(
         if (loginJob?.isActive == true) return
         loginJob = viewModelScope.launch {
             if (!forceRefresh) {
-                repository.validSession()?.let { session ->
-                    mutableState.value = BigScreenDeviceLoginState.Authenticated(session)
+                val cachedSession = repository.validSession()
+                if (cachedSession == null) {
+                    Log.i(LOG_TAG, "应用启动：没有可用的缓存大屏登录信息。")
+                } else {
+                    Log.i(LOG_TAG, "应用启动恢复登录信息：accessToken=${cachedSession.accessToken}, userId=${cachedSession.userId}, userName=${cachedSession.userName}, nickName=${cachedSession.nickName}, organId=${cachedSession.organId}, organName=${cachedSession.organName}")
+                    mutableState.value = BigScreenDeviceLoginState.Authenticated(cachedSession)
                     effectChannel.send(BigScreenDeviceLoginEffect.SessionRestored)
                     return@launch
                 }
